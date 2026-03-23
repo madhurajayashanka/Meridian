@@ -1,0 +1,41 @@
+aws_region             = "us-east-1"
+environment            = "production"
+app_name               = "meridian"
+vpc_cidr               = "10.0.0.0/16"
+availability_zones     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+private_subnet_cidrs   = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs    = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# RDS Configuration
+rds_db_name          = "meridiandb"
+rds_username         = "meridianadmin"
+# Password must be at least 8 characters and contain uppercase, lowercase, and numbers
+# NEVER commit actual passwords - use environment variables or secrets
+rds_password         = "ChangeMe123"
+rds_instance_class   = "db.t4g.medium"
+rds_allocated_storage = 100
+
+# Redis Configuration
+redis_engine_version    = "7.0"
+redis_node_type         = "cache.t4g.small"
+redis_num_cache_nodes   = 2
+
+# EKS Configuration
+eks_cluster_version = "1.28"
+eks_desired_size    = 3
+eks_min_size        = 2
+eks_max_size        = 10
+
+# S3 Configuration
+s3_document_bucket_name = "meridian-documents"
+s3_reports_bucket_name  = "meridian-reports"
+
+# Enable NAT Gateway for private subnets
+enable_nat_gateway = true
+
+# Tags
+tags = {
+  Project     = "meridian"
+  Environment = "production"
+  ManagedBy   = "terraform"
+}

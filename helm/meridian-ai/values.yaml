@@ -1,0 +1,189 @@
+# Default values for meridian-ai service
+replicaCount: 2
+
+image:
+  repository: ghcr.io/meridian-research/ai
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: ai.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: meridian-ai-tls
+      hosts:
+        - ai.example.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - meridian-ai
+          topologyKey: kubernetes.io/hostname
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 45
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 2
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# Environment variables from ConfigMap
+configMap:
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"
+  RAG_CHUNK_SIZE: "1000"
+  RAG_OVERLAP: "200"
+  MAX_CONCURRENT_REQUESTS: "10"
+  REQUEST_TIMEOUT_SECONDS: "300"
+
+# Secrets to mount (provided via helm values or external secret operator)
+secrets:
+  ANTHROPIC_API_KEY: ""
+  OPENAI_API_KEY: ""
+  DATABASE_URL: ""
+  REDIS_URL: ""
+  VECTORSTORE_PATH: "/data/vectorstore"
+
+# PersistentVolume for cache/vectorstore
+persistence:
+  enabled: false
+  storageClassName: "gp2"
+  accessMode: ReadWriteOnce
+  size: "10Gi"
+  mountPath: /data
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# NetworkPolicy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379  # Redis
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53   # DNS
+        - protocol: UDP
+          port: 53   # DNS
+    - ports:
+        - protocol: TCP
+          port: 443  # HTTPS for external APIs
+
+# Resource quotas for the namespace
+resourceQuota:
+  enabled: false
+  requests:
+    cpu: 4
+    memory: 8Gi
+  limits:
+    cpu: 8
+    memory: 16Gi

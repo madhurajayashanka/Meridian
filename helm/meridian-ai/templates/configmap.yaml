@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meridian-ai.fullname" . }}-config
+  labels:
+    {{- include "meridian-ai.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.configMap }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  REDIS_HOST: redis.default.svc.cluster.local
+  REDIS_PORT: "6379"
+  DATABASE_HOST: postgres.default.svc.cluster.local
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "meridian"

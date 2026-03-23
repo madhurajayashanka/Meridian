@@ -1,0 +1,222 @@
+# Meridian Platform Helm Chart Values
+# Default values for all services
+
+# Global settings
+global:
+  environment: production
+  domain: meridian.example.com
+  
+  # Image registry
+  imageRegistry: ghcr.io
+  imagePullSecrets: []
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  
+  # TLS/SSL certificate
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+    email: admin@meridian.example.com
+
+# Meridian API Service Subchart
+meridian-api:
+  enabled: true
+  
+  replicaCount: 3
+  
+  image:
+    repository: ghcr.io/meridian-research/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  
+  ingress:
+    enabled: true
+    hosts:
+      - host: api.meridian.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  
+  # Environment variables
+  env:
+    - name: SPRING_PROFILES_ACTIVE
+      value: production
+    - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+      value: "20"
+    - name: SERVER_SERVLET_SESSION_TIMEOUT
+      value: "1800s"
+  
+  # Secrets from AWS Secrets Manager
+  secrets:
+    existingSecret: meridian-api-secrets
+    database:
+      key: db-url
+      envName: SPRING_DATASOURCE_URL
+    redis:
+      key: redis-url
+      envName: SPRING_REDIS_URL
+    jwt:
+      key: jwt-secret
+      envName: JWT_SECRET
+
+# Meridian AI Service Subchart
+meridian-ai:
+  enabled: true
+  
+  replicaCount: 2
+  
+  image:
+    repository: ghcr.io/meridian-research/ai
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  ingress:
+    enabled: true
+    hosts:
+      - host: ai.meridian.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 80
+  
+  # Environment variables
+  configMap:
+    ENVIRONMENT: production
+    LOG_LEVEL: INFO
+    MAX_CONCURRENT_REQUESTS: "10"
+  
+  # Secrets
+  secrets:
+    ANTHROPIC_API_KEY: ""
+    OPENAI_API_KEY: ""
+    DATABASE_URL: ""
+    REDIS_URL: ""
+
+# Meridian Frontend Subchart
+meridian-frontend:
+  enabled: true
+  
+  replicaCount: 2
+  
+  image:
+    repository: ghcr.io/meridian-research/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  ingress:
+    enabled: true
+    hosts:
+      - host: meridian.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 80
+  
+  # Environment variables
+  configMap:
+    NODE_ENV: production
+    NEXT_PUBLIC_API_URL: https://api.meridian.example.com
+    NEXT_PUBLIC_API_GRAPHQL_URL: https://api.meridian.example.com/graphql
+    NEXT_PUBLIC_APP_VERSION: "1.0"
+
+# Monitoring and Observability
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    retention: 30d
+    storageSize: 20Gi
+  
+  grafana:
+    enabled: true
+    adminPassword: changeme
+
+# Network Policies
+networkPolicy:
+  enabled: true
+
+# Pod Security Policies
+podSecurityPolicy:
+  enabled: true
+
+# RBAC Configuration
+rbac:
+  enabled: true
+
+# Service Accounts
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Node selection
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}

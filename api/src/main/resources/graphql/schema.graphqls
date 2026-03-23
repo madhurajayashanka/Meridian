@@ -1,0 +1,234 @@
+# Meridian GraphQL Schema
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enum JobStatus {
+    PENDING
+    RUNNING
+    COMPLETE
+    FAILED
+    CANCELLED
+}
+
+enum ResearchDepth {
+    QUICK
+    STANDARD
+    DEEP
+}
+
+enum LLMProvider {
+    BEDROCK
+    OPENAI
+}
+
+enum DocumentStatus {
+    PROCESSING
+    READY
+    FAILED
+}
+
+enum ChatRole {
+    USER
+    ASSISTANT
+    SYSTEM
+}
+
+# =============================================================================
+# Types
+# =============================================================================
+
+type User {
+    id: ID!
+    email: String!
+    name: String!
+    avatarUrl: String
+    createdAt: String!
+    updatedAt: String!
+}
+
+type Project {
+    id: ID!
+    name: String!
+    description: String
+    isArchived: Boolean!
+    createdAt: String!
+    updatedAt: String!
+    jobCount: Int!
+    lastActivityAt: String
+    owner: User!
+}
+
+type Document {
+    id: ID!
+    originalFilename: String!
+    fileType: String!
+    fileSizeBytes: Long!
+    status: DocumentStatus!
+    errorMessage: String
+    chunkCount: Int
+    createdAt: String!
+    updatedAt: String!
+    project: Project!
+}
+
+type ResearchJob {
+    id: ID!
+    query: String!
+    status: JobStatus!
+    llmProvider: LLMProvider!
+    researchDepth: ResearchDepth!
+    createdAt: String!
+    startedAt: String
+    completedAt: String
+    updatedAt: String!
+    errorMessage: String
+    executionTimeMs: Long
+    project: Project!
+    report: Report
+}
+
+type Report {
+    id: ID!
+    title: String!
+    wordCount: Int
+    citationCount: Int!
+    criticScore: Float
+    revisionCount: Int!
+    isPublic: Boolean!
+    createdAt: String!
+    updatedAt: String!
+    job: ResearchJob!
+    project: Project!
+}
+
+type ChatMessage {
+    id: ID!
+    role: ChatRole!
+    content: String!
+    tokensUsed: Int
+    createdAt: String!
+    report: Report!
+}
+
+# =============================================================================
+# Input Types
+# =============================================================================
+
+input CreateProjectInput {
+    name: String!
+    description: String
+}
+
+input UpdateProjectInput {
+    id: ID!
+    name: String
+    description: String
+    isArchived: Boolean
+}
+
+input CreateResearchJobInput {
+    projectId: ID!
+    query: String!
+    llmProvider: LLMProvider
+    researchDepth: ResearchDepth
+    documentIds: [ID!]
+}
+
+input SendChatMessageInput {
+    reportId: ID!
+    content: String!
+}
+
+# =============================================================================
+# Queries
+# =============================================================================
+
+type Query {
+    # Authentication & User
+    me: User
+    user(id: ID!): User
+
+    # Projects
+    projects: [Project!]!
+    project(id: ID!): Project
+
+    # Research Jobs
+    jobs(projectId: ID): [ResearchJob!]!
+    job(id: ID!): ResearchJob
+
+    # Documents
+    documents(projectId: ID!): [Document!]!
+    document(id: ID!): Document
+
+    # Reports
+    reports(projectId: ID): [Report!]!
+    report(id: ID!): Report
+    publicReports: [Report!]!
+
+    # Chat
+    chatMessages(reportId: ID!): [ChatMessage!]!
+
+    # Health check
+    health: String!
+}
+
+# =============================================================================
+# Mutations
+# =============================================================================
+
+type Mutation {
+    # Authentication
+    register(email: String!, password: String!, name: String!): AuthPayload!
+    login(email: String!, password: String!): AuthPayload!
+    refreshToken(refreshToken: String!): AuthPayload!
+    logout: Boolean!
+    changePassword(currentPassword: String!, newPassword: String!): Boolean!
+
+    # User Profile
+    updateProfile(name: String, avatarUrl: String): User!
+    deleteAccount: Boolean!
+
+    # Projects
+    createProject(input: CreateProjectInput!): Project!
+    updateProject(input: UpdateProjectInput!): Project!
+    deleteProject(id: ID!): Boolean!
+    archiveProject(id: ID!): Boolean!
+
+    # Research Jobs
+    createResearchJob(input: CreateResearchJobInput!): ResearchJob!
+    cancelResearchJob(id: ID!): Boolean!
+
+    # Documents
+    uploadDocument(projectId: ID!, file: Upload!): Document!
+    deleteDocument(id: ID!): Boolean!
+
+    # Reports
+    exportReport(id: ID!, format: String!): String!
+    deleteReport(id: ID!): Boolean!
+    publishReport(id: ID!): Boolean!
+    unpublishReport(id: ID!): Boolean!
+
+    # Chat
+    sendChatMessage(input: SendChatMessageInput!): ChatMessage!
+    clearChatHistory(reportId: ID!): Boolean!
+}
+
+# =============================================================================
+# Payload Types
+# =============================================================================
+
+type AuthPayload {
+    accessToken: String!
+    refreshToken: String!
+    user: User!
+    expiresIn: Int!
+}
+
+# =============================================================================
+# Scalar Types
+# =============================================================================
+
+scalar Upload
+scalar Long

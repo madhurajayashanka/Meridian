@@ -1,0 +1,32 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+
+  redis:
+    timeout: 2000
+
+  security:
+    jwt:
+      secret: test-secret-key-for-testing-only-1234567890123456789012345678901
+      expiration: 900000  # 15 minutes in milliseconds
+
+  graphql:
+    graphiql:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.meridian: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.graphql: DEBUG

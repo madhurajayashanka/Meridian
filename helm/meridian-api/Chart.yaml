@@ -1,0 +1,10 @@
+apiVersion: v2
+name: meridian-api
+description: Spring Boot API service for Meridian platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Meridian Team
+    email: team@meridian.ai

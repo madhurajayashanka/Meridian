@@ -1,0 +1,46 @@
+# Helm values for NGINX Ingress Controller
+controller:
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - nginx-ingress
+            topologyKey: kubernetes.io/hostname
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  config:
+    # Enable CORS for frontend
+    enable-cors: "true"
+    cors-allow-origin: "https://meridian.example.com"
+    cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    cors-allow-headers: "Authorization, Content-Type"
+    # Security headers
+    add-headers: "default/custom-headers"
+    # Rate limiting
+    limit-rps: "100"
+    limit-connections: "20"
+    # Timeouts
+    proxy-connect-timeout: "600"
+    proxy-send-timeout: "600"
+    proxy-body-size: "100m"

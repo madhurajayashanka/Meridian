@@ -1,0 +1,95 @@
+spring:
+  application:
+    name: meridian-api
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian_dev_password}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    timeout: 2000ms
+    jedis:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  graphql:
+    graphiql:
+      enabled: true
+      path: /graphql
+      title: Meridian GraphQL API
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8000}
+
+  webflux:
+    base-path: /api
+
+server:
+  port: ${SERVER_PORT:8000}
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    root: INFO
+    com.meridian: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+app:
+  jwt:
+    access-token-expiry-minutes: ${JWT_ACCESS_TOKEN_EXPIRY_MINUTES:15}
+    refresh-token-expiry-days: ${JWT_REFRESH_TOKEN_EXPIRY_DAYS:7}
+    algorithm: RS256
+
+  rate-limit:
+    general-requests-per-minute: ${RATE_LIMIT_GENERAL_REQ_PER_MIN:60}
+    job-submissions-per-hour: ${RATE_LIMIT_JOB_REQ_PER_HOUR:5}
+
+  content-policy:
+    enabled: ${CONTENT_POLICY_ENABLED:true}
+
+  research:
+    max-query-length: 500
+    min-query-length: 10
+    max-documents-per-job: 5
+    max-upload-size-mb: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true

@@ -1,0 +1,49 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+.gradle/
+target/
+out/
+*.jar
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.next/
+coverage/
+playwright-report/
+test-results/
+
+# Logs / temp
+logs/
+*.log
+tmp/
+temp/
+*.tmp
