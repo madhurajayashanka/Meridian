@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import React, { useState, useRef } from 'react';
-import { useApiClient } from '@/hooks/useApiClient';
+import React, { useState, useRef } from "react";
+import { useApiClient } from "@/hooks/useApiClient";
 
 interface UploadedDocument {
   id: string;
   originalFilename: string;
-  status: 'PROCESSING' | 'READY' | 'FAILED';
+  status: "PROCESSING" | "READY" | "FAILED";
   chunkCount?: number;
   errorMessage?: string;
 }
@@ -16,7 +16,10 @@ interface DocumentUploadProps {
   onUploadComplete?: (document: UploadedDocument) => void;
 }
 
-export default function DocumentUpload({ projectId, onUploadComplete }: DocumentUploadProps) {
+export default function DocumentUpload({
+  projectId,
+  onUploadComplete,
+}: DocumentUploadProps) {
   const apiClient = useApiClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,10 +28,11 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedDocument, setUploadedDocument] = useState<UploadedDocument | null>(null);
+  const [uploadedDocument, setUploadedDocument] =
+    useState<UploadedDocument | null>(null);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_TYPES = ['application/pdf', 'text/plain'];
+  const ALLOWED_TYPES = ["application/pdf", "text/plain"];
 
   const validateFile = (file: File): string | null => {
     if (file.size > MAX_FILE_SIZE) {
@@ -86,7 +90,7 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
 
   const handleUpload = async () => {
     if (!currentFile) {
-      setUploadError('No file selected');
+      setUploadError("No file selected");
       return;
     }
 
@@ -102,15 +106,15 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
 
       // Create FormData for file upload
       const formData = new FormData();
-      formData.append('file', currentFile);
-      formData.append('projectId', projectId);
+      formData.append("file", currentFile);
+      formData.append("projectId", projectId);
 
       // Upload via REST API (using fetch since this is file upload)
-      const response = await fetch('/api/v1/documents/upload', {
-        method: 'POST',
+      const response = await fetch("/api/v1/documents/upload", {
+        method: "POST",
         body: formData,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
+          Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
         },
       });
 
@@ -119,7 +123,7 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Upload failed');
+        throw new Error(errorData.message || "Upload failed");
       }
 
       const result = await response.json();
@@ -127,7 +131,7 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
         const newDocument: UploadedDocument = {
           id: result.id,
           originalFilename: result.originalFilename,
-          status: 'PROCESSING',
+          status: "PROCESSING",
           chunkCount: result.chunkCount,
         };
         setUploadedDocument(newDocument);
@@ -141,8 +145,8 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
         }
       }
     } catch (error: any) {
-      console.error('Upload error:', error);
-      setUploadError(error.message || 'Failed to upload document');
+      console.error("Upload error:", error);
+      setUploadError(error.message || "Failed to upload document");
     } finally {
       setIsUploading(false);
       setCurrentFile(null);
@@ -155,15 +159,13 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
 
     const checkStatus = async () => {
       if (attempts >= maxAttempts) {
-        setUploadError('Document processing timeout');
+        setUploadError("Document processing timeout");
         return;
       }
 
       try {
-        const response = await apiClient.post(
-          '/graphql',
-          {
-            query: `
+        const response = await apiClient.post("/graphql", {
+          query: `
               query GetDocument($id: ID!) {
                 document(id: $id) {
                   id
@@ -173,9 +175,8 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
                 }
               }
             `,
-            variables: { id: documentId },
-          }
-        );
+          variables: { id: documentId },
+        });
 
         if (response.data?.document) {
           const doc = response.data.document;
@@ -187,16 +188,16 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
                   chunkCount: doc.chunkCount,
                   errorMessage: doc.errorMessage,
                 }
-              : null
+              : null,
           );
 
-          if (doc.status === 'READY' || doc.status === 'FAILED') {
+          if (doc.status === "READY" || doc.status === "FAILED") {
             // Status resolved
             return;
           }
         }
       } catch (error) {
-        console.error('Error checking document status:', error);
+        console.error("Error checking document status:", error);
       }
 
       // Poll again after 2 seconds
@@ -208,9 +209,9 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
   };
 
   const getFileTypeIcon = (filename: string): string => {
-    if (filename.endsWith('.pdf')) return '📄';
-    if (filename.endsWith('.txt')) return '📝';
-    return '📋';
+    if (filename.endsWith(".pdf")) return "📄";
+    if (filename.endsWith(".txt")) return "📝";
+    return "📋";
   };
 
   return (
@@ -223,8 +224,8 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
           onDrop={handleDrop}
           className={`border-2 border-dashed rounded-lg p-8 text-center transition ${
             isDragging
-              ? 'border-blue-400 bg-blue-900/20'
-              : 'border-slate-600 bg-slate-900/50 hover:border-slate-500'
+              ? "border-blue-400 bg-blue-900/20"
+              : "border-slate-600 bg-slate-900/50 hover:border-slate-500"
           }`}
         >
           <input
@@ -237,7 +238,9 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
 
           {currentFile ? (
             <div className="space-y-4">
-              <div className="text-3xl mb-2">{getFileTypeIcon(currentFile.name)}</div>
+              <div className="text-3xl mb-2">
+                {getFileTypeIcon(currentFile.name)}
+              </div>
               <p className="text-white font-medium">{currentFile.name}</p>
               <p className="text-slate-400 text-sm">
                 {(currentFile.size / 1024 / 1024).toFixed(2)} MB
@@ -248,12 +251,12 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
                   disabled={isUploading}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 text-white rounded-lg transition"
                 >
-                  {isUploading ? 'Uploading...' : 'Upload Document'}
+                  {isUploading ? "Uploading..." : "Upload Document"}
                 </button>
                 <button
                   onClick={() => {
                     setCurrentFile(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition"
                 >
@@ -267,9 +270,15 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
               className="cursor-pointer"
             >
               <div className="text-4xl mb-4">📤</div>
-              <p className="text-white font-medium mb-2">Drag and drop your files here</p>
-              <p className="text-slate-400 text-sm mb-4">or click to select files</p>
-              <p className="text-slate-500 text-xs">Supported: PDF, TXT (max 10 MB)</p>
+              <p className="text-white font-medium mb-2">
+                Drag and drop your files here
+              </p>
+              <p className="text-slate-400 text-sm mb-4">
+                or click to select files
+              </p>
+              <p className="text-slate-500 text-xs">
+                Supported: PDF, TXT (max 10 MB)
+              </p>
             </div>
           )}
         </div>
@@ -280,7 +289,9 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-4">
           <div className="flex justify-between items-center mb-2">
             <p className="text-white text-sm font-medium">Uploading...</p>
-            <p className="text-slate-400 text-sm">{Math.round(uploadProgress)}%</p>
+            <p className="text-slate-400 text-sm">
+              {Math.round(uploadProgress)}%
+            </p>
           </div>
           <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
             <div
@@ -302,57 +313,71 @@ export default function DocumentUpload({ projectId, onUploadComplete }: Document
       {uploadedDocument && (
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">{getFileTypeIcon(uploadedDocument.originalFilename)}</span>
+            <span className="text-2xl">
+              {getFileTypeIcon(uploadedDocument.originalFilename)}
+            </span>
             <div className="flex-1">
-              <p className="text-white font-medium truncate">{uploadedDocument.originalFilename}</p>
+              <p className="text-white font-medium truncate">
+                {uploadedDocument.originalFilename}
+              </p>
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${
-                    uploadedDocument.status === 'READY'
-                      ? 'bg-green-500'
-                      : uploadedDocument.status === 'PROCESSING'
-                        ? 'bg-blue-500 animate-pulse'
-                        : 'bg-red-500'
+                    uploadedDocument.status === "READY"
+                      ? "bg-green-500"
+                      : uploadedDocument.status === "PROCESSING"
+                        ? "bg-blue-500 animate-pulse"
+                        : "bg-red-500"
                   }`}
                 />
                 <span className="text-xs text-slate-400 capitalize">
-                  {uploadedDocument.status === 'PROCESSING' ? 'Processing...' : uploadedDocument.status}
+                  {uploadedDocument.status === "PROCESSING"
+                    ? "Processing..."
+                    : uploadedDocument.status}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Processing Progress */}
-          {uploadedDocument.status === 'PROCESSING' && (
+          {uploadedDocument.status === "PROCESSING" && (
             <div className="space-y-2">
               <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+                <div
+                  className="h-full bg-blue-500 rounded-full animate-pulse"
+                  style={{ width: "60%" }}
+                />
               </div>
-              <p className="text-xs text-slate-400">Extracting and embedding document...</p>
+              <p className="text-xs text-slate-400">
+                Extracting and embedding document...
+              </p>
             </div>
           )}
 
           {/* Completed Status */}
-          {uploadedDocument.status === 'READY' && uploadedDocument.chunkCount && (
-            <div className="text-xs text-slate-400 mt-2">
-              ✓ Successfully processed into {uploadedDocument.chunkCount} chunks
-            </div>
-          )}
+          {uploadedDocument.status === "READY" &&
+            uploadedDocument.chunkCount && (
+              <div className="text-xs text-slate-400 mt-2">
+                ✓ Successfully processed into {uploadedDocument.chunkCount}{" "}
+                chunks
+              </div>
+            )}
 
           {/* Error Status */}
-          {uploadedDocument.status === 'FAILED' && uploadedDocument.errorMessage && (
-            <div className="text-xs text-red-400 mt-2">
-              ✗ {uploadedDocument.errorMessage}
-            </div>
-          )}
+          {uploadedDocument.status === "FAILED" &&
+            uploadedDocument.errorMessage && (
+              <div className="text-xs text-red-400 mt-2">
+                ✗ {uploadedDocument.errorMessage}
+              </div>
+            )}
 
           {/* Upload Another */}
-          {uploadedDocument.status === 'READY' && (
+          {uploadedDocument.status === "READY" && (
             <button
               onClick={() => {
                 setUploadedDocument(null);
                 setUploadError(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
+                if (fileInputRef.current) fileInputRef.current.value = "";
               }}
               className="mt-4 w-full text-sm text-blue-400 hover:text-blue-300 transition"
             >

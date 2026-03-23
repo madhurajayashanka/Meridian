@@ -11,6 +11,7 @@ Runs on every push to `main`/`develop` branches and all pull requests.
 #### Jobs:
 
 **Backend (Spring Boot)**
+
 - Java linting with Checkstyle
 - Unit tests with JUnit 5
 - Integration tests with Testcontainers
@@ -18,6 +19,7 @@ Runs on every push to `main`/`develop` branches and all pull requests.
 - JAR build and artifact upload
 
 **AI Service (FastAPI)**
+
 - Linting with Pylint
 - Code formatting checks (black, isort)
 - Property-based tests with Hypothesis
@@ -25,6 +27,7 @@ Runs on every push to `main`/`develop` branches and all pull requests.
 - Code coverage (minimum 75%)
 
 **Frontend (Next.js)**
+
 - Linting with ESLint
 - TypeScript type checking
 - Unit tests with Vitest
@@ -32,11 +35,13 @@ Runs on every push to `main`/`develop` branches and all pull requests.
 - Next.js build
 
 **Container Builds** (on main branch only)
+
 - Multi-service Docker image builds (API, AI, Frontend)
 - Automatic push to GitHub Container Registry (ghcr.io)
 - Cross-platform builds with Docker Buildx
 
 **Security Scanning**
+
 - Trivy vulnerability scanner for dependencies
 - CodeQL static analysis (Java, Python, JavaScript)
 - Upload results to GitHub Security tab
@@ -48,6 +53,7 @@ Runs on push to `main` branch after CI passes (automatic) or manually via workfl
 #### Jobs:
 
 **Terraform**
+
 - Infrastructure provisioning to AWS
 - `terraform plan` with artifact upload
 - PR comments with plan details
@@ -55,6 +61,7 @@ Runs on push to `main` branch after CI passes (automatic) or manually via workfl
 - Output export (database endpoints, Redis, S3 buckets)
 
 **Helm Deploy**
+
 - Kubernetes cluster connectivity via EKS
 - cert-manager installation for TLS
 - NGINX Ingress controller setup
@@ -62,11 +69,13 @@ Runs on push to `main` branch after CI passes (automatic) or manually via workfl
 - Rollout verification for all services
 
 **E2E Tests**
+
 - Playwright test suite execution
 - Validates end-to-end user workflows
 - Artifact upload for failed test reports
 
 **Notifications**
+
 - Slack webhooks for success/failure alerts
 - Workflow run links for quick debugging
 
@@ -154,6 +163,7 @@ aws dynamodb create-table \
 Ensure you have access to GitHub Container Registry (ghcr.io). The pipeline uses `GITHUB_TOKEN` by default.
 
 Optional: Create a Personal Access Token for dedicated registry access:
+
 ```bash
 # Generate PAT with these scopes: read:packages, write:packages
 # Add to GitHub secrets as REGISTRY_PASSWORD
@@ -162,11 +172,13 @@ Optional: Create a Personal Access Token for dedicated registry access:
 ## Pipeline Triggers
 
 ### Automatic Triggers:
+
 - **Push to main**: Runs full CI → Container builds → Deploy to production
 - **Push to develop**: Runs full CI only (no deployment)
 - **Pull Request**: Runs CI pipeline (lint, test, security scan)
 
 ### Manual Triggers:
+
 ```bash
 # Deploy to staging/production without code changes
 gh workflow run deploy.yml -f environment=staging
@@ -176,6 +188,7 @@ gh workflow run deploy.yml -f environment=production
 ## Monitoring & Debugging
 
 ### View Workflow Status:
+
 ```bash
 # List all workflows
 gh workflow list
@@ -193,16 +206,20 @@ gh run download <RUN_ID>
 ### Common Issues:
 
 **1. CodeQL timeout**
+
 - Reduce analysis scope or increase timeout in `.github/workflows/ci.yml`
 
 **2. Docker build failures**
+
 - Check Dockerfile syntax: `docker build -f api/Dockerfile ./api`
 - Verify dependencies in requirements.txt / package.json
 
 **3. Terraform lock contention**
+
 - Manually unlock: `aws dynamodb delete-item --table-name terraform-lock --key '{"LockID": {"S": "path/to/tfstate"}}'`
 
 **4. EKS deployment failures**
+
 - Verify cluster access: `aws eks describe-cluster --name meridian-eks-cluster`
 - Check RBAC: `kubectl get clusterrolebindings`
 - View pod logs: `kubectl logs -n meridian deployment/meridian-api`
@@ -210,13 +227,15 @@ gh run download <RUN_ID>
 ## Performance Optimization
 
 ### Caching:
+
 - ✅ Gradle cache (Java dependencies)
-- ✅ pip cache (Python dependencies)  
+- ✅ pip cache (Python dependencies)
 - ✅ npm cache (Node.js dependencies)
 - ✅ Docker layer caching (BuildKit)
 - ✅ GitHub Actions cache (gha)
 
 ### Parallelization:
+
 - Backend, AI service, and frontend tests run in parallel
 - Container builds start after all tests pass
 - Deployment waits for all containers ready
@@ -227,18 +246,21 @@ gh run download <RUN_ID>
 ## Cost Estimation
 
 Using **GitHub Actions free tier**:
+
 - 2,000 free minutes/month (private repo)
 - Each run: ~10-15 minutes
 - Approximately 120-200 runs/month (daily + PR)
 - **No cost** within free tier
 
 For higher volume:
+
 - $0.25 per additional minute
 - Optimize with caching and matrix strategy efficiency
 
 ## Security Considerations
 
 ✅ **Implemented**:
+
 - OIDC for AWS (no long-lived credentials)
 - Container scanning with Trivy
 - Static analysis with CodeQL
@@ -246,6 +268,7 @@ For higher volume:
 - Artifact cleanup after 5-7 days
 
 ⚠️ **Recommended**:
+
 - Enable branch protection rules
 - Require workflow approval before deployment
 - Regular dependency updates (Dependabot)
@@ -255,6 +278,7 @@ For higher volume:
 ## Runbooks
 
 ### Rollback Deployment
+
 ```bash
 # Last known good version
 helm rollback meridian 1 -n meridian
@@ -264,6 +288,7 @@ kubectl rollout status deployment/meridian-api -n meridian
 ```
 
 ### Push hotfix to production
+
 ```bash
 git checkout -b hotfix/issue-xyz main
 # ... make fixes ...
@@ -273,6 +298,7 @@ git push origin hotfix/issue-xyz
 ```
 
 ### Manual deployment
+
 ```bash
 gh workflow run deploy.yml -f environment=production --ref main
 ```

@@ -610,7 +610,7 @@ All previously listed remaining tasks are now complete:
 - [x] Task 36: E2E Playwright tests
 - [x] Task 37: Final checkpoint
 
-Validation and delivery details are captured in `COMPLETION_SUMMARY.md` and `CICD_SUMMARY.md`.
+Validation and delivery details are captured in `COMPLETION_SUMMARY.md` and `.github/CICD_SUMMARY.md`.
 
 ---
 

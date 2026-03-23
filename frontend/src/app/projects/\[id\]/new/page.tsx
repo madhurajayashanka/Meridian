@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { useApiClient } from '@/hooks/useApiClient';
-import Navigation from '@/components/Navigation';
-import Link from 'next/link';
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useApiClient } from "@/hooks/useApiClient";
+import Navigation from "@/components/Navigation";
+import Link from "next/link";
 
 interface Document {
   id: string;
   originalFilename: string;
-  status: 'PROCESSING' | 'READY' | 'FAILED';
+  status: "PROCESSING" | "READY" | "FAILED";
   chunkCount?: number;
 }
 
@@ -21,9 +21,9 @@ export default function ResearchFormPage() {
   const { isAuthenticated, userId } = useAuth();
   const apiClient = useApiClient();
 
-  const [query, setQuery] = useState('');
-  const [llmProvider, setLlmProvider] = useState('BEDROCK');
-  const [researchDepth, setResearchDepth] = useState('STANDARD');
+  const [query, setQuery] = useState("");
+  const [llmProvider, setLlmProvider] = useState("BEDROCK");
+  const [researchDepth, setResearchDepth] = useState("STANDARD");
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ export default function ResearchFormPage() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [isAuthenticated, router]);
 
@@ -46,10 +46,8 @@ export default function ResearchFormPage() {
       setError(null);
 
       try {
-        const response = await apiClient.post(
-          '/graphql',
-          {
-            query: `
+        const response = await apiClient.post("/graphql", {
+          query: `
               query GetDocuments($projectId: ID!) {
                 documents(projectId: $projectId) {
                   id
@@ -59,15 +57,18 @@ export default function ResearchFormPage() {
                 }
               }
             `,
-            variables: { projectId },
-          }
-        );
+          variables: { projectId },
+        });
 
         if (response.data?.documents) {
-          setDocuments(response.data.documents.filter((doc: Document) => doc.status === 'READY'));
+          setDocuments(
+            response.data.documents.filter(
+              (doc: Document) => doc.status === "READY",
+            ),
+          );
         }
       } catch (err) {
-        console.error('Failed to load documents:', err);
+        console.error("Failed to load documents:", err);
         // Non-fatal error, allow form submission without documents
       } finally {
         setLoading(false);
@@ -94,26 +95,24 @@ export default function ResearchFormPage() {
 
     // Validation
     if (query.length < 10) {
-      setError('Query must be at least 10 characters');
+      setError("Query must be at least 10 characters");
       return;
     }
     if (query.length > 500) {
-      setError('Query must not exceed 500 characters');
+      setError("Query must not exceed 500 characters");
       return;
     }
 
     if (!projectId) {
-      setError('Project not found');
+      setError("Project not found");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const response = await apiClient.post(
-        '/graphql',
-        {
-          query: `
+      const response = await apiClient.post("/graphql", {
+        query: `
             mutation CreateResearchJob($input: CreateResearchJobInput!) {
               createResearchJob(input: $input) {
                 id
@@ -122,27 +121,26 @@ export default function ResearchFormPage() {
               }
             }
           `,
-          variables: {
-            input: {
-              projectId,
-              query,
-              llmProvider,
-              researchDepth,
-              documentIds: selectedDocuments,
-            },
+        variables: {
+          input: {
+            projectId,
+            query,
+            llmProvider,
+            researchDepth,
+            documentIds: selectedDocuments,
           },
-        }
-      );
+        },
+      });
 
       if (response.data?.createResearchJob?.id) {
         const jobId = response.data.createResearchJob.id;
         router.push(`/jobs/${jobId}/live`);
       } else {
-        setError('Failed to create research job');
+        setError("Failed to create research job");
       }
     } catch (err: any) {
-      console.error('Research submission error:', err);
-      setError(err?.message || 'Failed to submit research job');
+      console.error("Research submission error:", err);
+      setError(err?.message || "Failed to submit research job");
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +156,10 @@ export default function ResearchFormPage() {
 
       <main className="max-w-2xl mx-auto px-4 py-12">
         <div className="mb-8">
-          <Link href={`/projects/${projectId}`} className="text-blue-400 hover:text-blue-300">
+          <Link
+            href={`/projects/${projectId}`}
+            className="text-blue-400 hover:text-blue-300"
+          >
             ← Back to Project
           </Link>
         </div>
@@ -178,7 +179,9 @@ export default function ResearchFormPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Query Input */}
             <div>
-              <label className="block text-sm font-medium mb-2">Research Query</label>
+              <label className="block text-sm font-medium mb-2">
+                Research Query
+              </label>
               <div className="relative">
                 <textarea
                   value={query}
@@ -191,13 +194,19 @@ export default function ResearchFormPage() {
               </div>
               <div className="flex justify-between text-xs text-slate-400 mt-1">
                 <span>Character count: {query.length}/500</span>
-                {query.length < 10 && <span className="text-red-400">Minimum 10 characters required</span>}
+                {query.length < 10 && (
+                  <span className="text-red-400">
+                    Minimum 10 characters required
+                  </span>
+                )}
               </div>
             </div>
 
             {/* LLM Provider Select */}
             <div>
-              <label className="block text-sm font-medium mb-2">LLM Provider</label>
+              <label className="block text-sm font-medium mb-2">
+                LLM Provider
+              </label>
               <select
                 value={llmProvider}
                 onChange={(e) => setLlmProvider(e.target.value)}
@@ -213,7 +222,9 @@ export default function ResearchFormPage() {
 
             {/* Research Depth Select */}
             <div>
-              <label className="block text-sm font-medium mb-2">Research Depth</label>
+              <label className="block text-sm font-medium mb-2">
+                Research Depth
+              </label>
               <select
                 value={researchDepth}
                 onChange={(e) => setResearchDepth(e.target.value)}
@@ -221,7 +232,9 @@ export default function ResearchFormPage() {
               >
                 <option value="QUICK">Quick (1 agent, ~5 min)</option>
                 <option value="STANDARD">Standard (3 agents, ~10 min)</option>
-                <option value="DEEP">Deep (5 agents with critiques, ~20 min)</option>
+                <option value="DEEP">
+                  Deep (5 agents with critiques, ~20 min)
+                </option>
               </select>
               <p className="text-xs text-slate-400 mt-1">
                 More depth = longer processing but more thorough research
@@ -231,24 +244,34 @@ export default function ResearchFormPage() {
             {/* Document Selection */}
             {documents.length > 0 && (
               <div>
-                <label className="block text-sm font-medium mb-2">Documents (Optional)</label>
+                <label className="block text-sm font-medium mb-2">
+                  Documents (Optional)
+                </label>
                 <p className="text-xs text-slate-400 mb-3">
                   Select up to 5 documents to augment the research
                 </p>
                 <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg p-3">
                   {documents.map((doc) => (
-                    <label key={doc.id} className="flex items-center gap-3 cursor-pointer hover:bg-slate-700 p-2 rounded">
+                    <label
+                      key={doc.id}
+                      className="flex items-center gap-3 cursor-pointer hover:bg-slate-700 p-2 rounded"
+                    >
                       <input
                         type="checkbox"
                         checked={selectedDocuments.includes(doc.id)}
                         onChange={() => handleDocumentToggle(doc.id)}
-                        disabled={!selectedDocuments.includes(doc.id) && selectedDocuments.length >= 5}
+                        disabled={
+                          !selectedDocuments.includes(doc.id) &&
+                          selectedDocuments.length >= 5
+                        }
                         className="w-4 h-4 rounded border-slate-600 text-blue-500 cursor-pointer"
                       />
                       <div className="flex-1">
                         <span className="text-sm">{doc.originalFilename}</span>
                         {doc.chunkCount && (
-                          <span className="text-xs text-slate-400 ml-2">({doc.chunkCount} chunks)</span>
+                          <span className="text-xs text-slate-400 ml-2">
+                            ({doc.chunkCount} chunks)
+                          </span>
                         )}
                       </div>
                     </label>
@@ -267,7 +290,7 @@ export default function ResearchFormPage() {
                 disabled={submitting || query.length < 10}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition"
               >
-                {submitting ? 'Submitting...' : 'Start Research'}
+                {submitting ? "Submitting..." : "Start Research"}
               </button>
               <Link
                 href={`/projects/${projectId}`}

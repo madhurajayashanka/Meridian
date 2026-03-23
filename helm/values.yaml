@@ -5,11 +5,11 @@
 global:
   environment: production
   domain: meridian.example.com
-  
+
   # Image registry
   imageRegistry: ghcr.io
   imagePullSecrets: []
-  
+
   # Ingress configuration
   ingress:
     enabled: true
@@ -17,7 +17,7 @@ global:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  
+
   # TLS/SSL certificate
   tls:
     enabled: true
@@ -27,19 +27,19 @@ global:
 # Meridian API Service Subchart
 meridian-api:
   enabled: true
-  
+
   replicaCount: 3
-  
+
   image:
     repository: ghcr.io/meridian-research/api
     tag: latest
     pullPolicy: IfNotPresent
-  
+
   service:
     type: ClusterIP
     port: 8080
     targetPort: 8080
-  
+
   ingress:
     enabled: true
     hosts:
@@ -47,7 +47,7 @@ meridian-api:
         paths:
           - path: /
             pathType: Prefix
-  
+
   resources:
     requests:
       memory: "512Mi"
@@ -55,14 +55,14 @@ meridian-api:
     limits:
       memory: "1Gi"
       cpu: "500m"
-  
+
   autoscaling:
     enabled: true
     minReplicas: 2
     maxReplicas: 10
     targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
-  
+
   # Environment variables
   env:
     - name: SPRING_PROFILES_ACTIVE
@@ -71,7 +71,7 @@ meridian-api:
       value: "20"
     - name: SERVER_SERVLET_SESSION_TIMEOUT
       value: "1800s"
-  
+
   # Secrets from AWS Secrets Manager
   secrets:
     existingSecret: meridian-api-secrets
@@ -88,19 +88,19 @@ meridian-api:
 # Meridian AI Service Subchart
 meridian-ai:
   enabled: true
-  
+
   replicaCount: 2
-  
+
   image:
     repository: ghcr.io/meridian-research/ai
     tag: latest
     pullPolicy: IfNotPresent
-  
+
   service:
     type: ClusterIP
     port: 8000
     targetPort: 8000
-  
+
   ingress:
     enabled: true
     hosts:
@@ -108,7 +108,7 @@ meridian-ai:
         paths:
           - path: /
             pathType: Prefix
-  
+
   resources:
     requests:
       memory: "1Gi"
@@ -116,20 +116,20 @@ meridian-ai:
     limits:
       memory: "2Gi"
       cpu: "1000m"
-  
+
   autoscaling:
     enabled: true
     minReplicas: 1
     maxReplicas: 5
     targetCPUUtilizationPercentage: 75
     targetMemoryUtilizationPercentage: 80
-  
+
   # Environment variables
   configMap:
     ENVIRONMENT: production
     LOG_LEVEL: INFO
     MAX_CONCURRENT_REQUESTS: "10"
-  
+
   # Secrets
   secrets:
     ANTHROPIC_API_KEY: ""
@@ -140,19 +140,19 @@ meridian-ai:
 # Meridian Frontend Subchart
 meridian-frontend:
   enabled: true
-  
+
   replicaCount: 2
-  
+
   image:
     repository: ghcr.io/meridian-research/frontend
     tag: latest
     pullPolicy: IfNotPresent
-  
+
   service:
     type: ClusterIP
     port: 3000
     targetPort: 3000
-  
+
   ingress:
     enabled: true
     hosts:
@@ -160,7 +160,7 @@ meridian-frontend:
         paths:
           - path: /
             pathType: Prefix
-  
+
   resources:
     requests:
       memory: "256Mi"
@@ -168,13 +168,13 @@ meridian-frontend:
     limits:
       memory: "512Mi"
       cpu: "250m"
-  
+
   autoscaling:
     enabled: true
     minReplicas: 2
     maxReplicas: 8
     targetCPUUtilizationPercentage: 80
-  
+
   # Environment variables
   configMap:
     NODE_ENV: production
@@ -189,7 +189,7 @@ monitoring:
     enabled: true
     retention: 30d
     storageSize: 20Gi
-  
+
   grafana:
     enabled: true
     adminPassword: changeme

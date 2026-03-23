@@ -134,7 +134,7 @@ configMap:
         port: 8080
         servlet:
           context-path: /
-      
+
       spring:
         jpa:
           hibernate:
@@ -145,7 +145,7 @@ configMap:
           graphiql:
             enabled: false
           schema-locations: classpath:graphql/
-      
+
       management:
         endpoints:
           web:
@@ -176,11 +176,11 @@ networkPolicy:
         - namespaceSelector: {}
       ports:
         - protocol: TCP
-          port: 5432  # PostgreSQL
+          port: 5432 # PostgreSQL
         - protocol: TCP
-          port: 6379  # Redis
+          port: 6379 # Redis
         - protocol: TCP
-          port: 443   # HTTPS
+          port: 443 # HTTPS
 
 # Pod Disruption Budget
 podDisruptionBudget:

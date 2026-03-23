@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useSSE } from '@/hooks/useSSE';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useSSE } from "@/hooks/useSSE";
 
 // Mock EventSource
 let mockEventSource: any = null;
@@ -16,7 +16,7 @@ const MockEventSource = vi.fn((url: string) => {
 
 (global as any).EventSource = MockEventSource;
 
-describe('useSSE Hook', () => {
+describe("useSSE Hook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEventSource = null;
@@ -26,33 +26,34 @@ describe('useSSE Hook', () => {
     delete (global as any).EventSource;
   });
 
-  it('should initialize with null event data', () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123'));
+  it("should initialize with null event data", () => {
+    const { result } = renderHook(() => useSSE("/api/stream/123"));
 
     expect(result.current.data).toBeNull();
     expect(result.current.error).toBeNull();
     expect(result.current.isConnected).toBe(false);
   });
 
-  it('should connect to EventSource with correct URL', () => {
-    const url = '/api/stream/job-123';
+  it("should connect to EventSource with correct URL", () => {
+    const url = "/api/stream/job-123";
     const { result } = renderHook(() => useSSE(url));
 
     expect(MockEventSource).toHaveBeenCalledWith(
-      expect.stringContaining('/api/stream/job-123')
+      expect.stringContaining("/api/stream/job-123"),
     );
   });
 
-  it('should handle incoming message events', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123'));
+  it("should handle incoming message events", async () => {
+    const { result } = renderHook(() => useSSE("/api/stream/123"));
 
     const mockMessage = { data: '{"status":"running","progress":50}' };
 
     await act(async () => {
       // Simulate a message event
       if (mockEventSource && mockEventSource.addEventListener) {
-        const messageHandler = (mockEventSource.addEventListener as any).mock.calls
-          .find((call: any[]) => call[0] === 'message')?.[1];
+        const messageHandler = (
+          mockEventSource.addEventListener as any
+        ).mock.calls.find((call: any[]) => call[0] === "message")?.[1];
         if (messageHandler) {
           messageHandler(mockMessage);
         }
@@ -64,16 +65,17 @@ describe('useSSE Hook', () => {
     expect(MockEventSource).toHaveBeenCalled();
   });
 
-  it('should handle connection errors with exponential backoff', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123'));
+  it("should handle connection errors with exponential backoff", async () => {
+    const { result } = renderHook(() => useSSE("/api/stream/123"));
 
     // Simulate an error event
     await act(async () => {
       if (mockEventSource && mockEventSource.addEventListener) {
-        const errorHandler = (mockEventSource.addEventListener as any).mock.calls
-          .find((call: any[]) => call[0] === 'error')?.[1];
+        const errorHandler = (
+          mockEventSource.addEventListener as any
+        ).mock.calls.find((call: any[]) => call[0] === "error")?.[1];
         if (errorHandler) {
-          errorHandler(new Error('Connection failed'));
+          errorHandler(new Error("Connection failed"));
         }
       }
     });
@@ -81,19 +83,22 @@ describe('useSSE Hook', () => {
     expect(MockEventSource).toHaveBeenCalled();
   });
 
-  it('should not exceed maximum connection attempts', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123', {
-      maxAttempts: 3,
-    }));
+  it("should not exceed maximum connection attempts", async () => {
+    const { result } = renderHook(() =>
+      useSSE("/api/stream/123", {
+        maxAttempts: 3,
+      }),
+    );
 
     // Simulate multiple connection failures
     for (let i = 0; i < 5; i++) {
       await act(async () => {
         if (mockEventSource && mockEventSource.addEventListener) {
-          const errorHandler = (mockEventSource.addEventListener as any).mock.calls
-            .find((call: any[]) => call[0] === 'error')?.[1];
+          const errorHandler = (
+            mockEventSource.addEventListener as any
+          ).mock.calls.find((call: any[]) => call[0] === "error")?.[1];
           if (errorHandler) {
-            errorHandler(new Error('Connection failed'));
+            errorHandler(new Error("Connection failed"));
           }
         }
       });
@@ -105,8 +110,8 @@ describe('useSSE Hook', () => {
     expect(MockEventSource).toHaveBeenCalled();
   });
 
-  it('should close connection on unmount', () => {
-    const { unmount } = renderHook(() => useSSE('/api/stream/123'));
+  it("should close connection on unmount", () => {
+    const { unmount } = renderHook(() => useSSE("/api/stream/123"));
 
     expect(mockEventSource).not.toBeNull();
 
@@ -117,29 +122,32 @@ describe('useSSE Hook', () => {
     }
   });
 
-  it('should disable auto-connect when flag is false', () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123', {
-      autoConnect: false,
-    }));
+  it("should disable auto-connect when flag is false", () => {
+    const { result } = renderHook(() =>
+      useSSE("/api/stream/123", {
+        autoConnect: false,
+      }),
+    );
 
     // Should not connect on initial mount
     expect(MockEventSource).not.toHaveBeenCalled();
   });
 
-  it('should parse JSON messages correctly', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123'));
+  it("should parse JSON messages correctly", async () => {
+    const { result } = renderHook(() => useSSE("/api/stream/123"));
 
     const testData = {
-      status: 'running',
+      status: "running",
       progress: 75,
-      agent: 'research',
+      agent: "research",
       timestamp: new Date().toISOString(),
     };
 
     await act(async () => {
       if (mockEventSource && mockEventSource.addEventListener) {
-        const messageHandler = (mockEventSource.addEventListener as any).mock.calls
-          .find((call: any[]) => call[0] === 'message')?.[1];
+        const messageHandler = (
+          mockEventSource.addEventListener as any
+        ).mock.calls.find((call: any[]) => call[0] === "message")?.[1];
         if (messageHandler) {
           messageHandler({ data: JSON.stringify(testData) });
         }
@@ -149,10 +157,12 @@ describe('useSSE Hook', () => {
     expect(MockEventSource).toHaveBeenCalled();
   });
 
-  it('should provide manual connect method', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123', {
-      autoConnect: false,
-    }));
+  it("should provide manual connect method", async () => {
+    const { result } = renderHook(() =>
+      useSSE("/api/stream/123", {
+        autoConnect: false,
+      }),
+    );
 
     // Initially not connected
     expect(MockEventSource).not.toHaveBeenCalled();
@@ -167,16 +177,17 @@ describe('useSSE Hook', () => {
     expect(MockEventSource).toHaveBeenCalled();
   });
 
-  it('should reset error state on successful reconnect', async () => {
-    const { result } = renderHook(() => useSSE('/api/stream/123'));
+  it("should reset error state on successful reconnect", async () => {
+    const { result } = renderHook(() => useSSE("/api/stream/123"));
 
     // Simulate error
     await act(async () => {
       if (mockEventSource && mockEventSource.addEventListener) {
-        const errorHandler = (mockEventSource.addEventListener as any).mock.calls
-          .find((call: any[]) => call[0] === 'error')?.[1];
+        const errorHandler = (
+          mockEventSource.addEventListener as any
+        ).mock.calls.find((call: any[]) => call[0] === "error")?.[1];
         if (errorHandler) {
-          errorHandler(new Error('Connection timeout'));
+          errorHandler(new Error("Connection timeout"));
         }
       }
     });
@@ -184,8 +195,9 @@ describe('useSSE Hook', () => {
     // Then successful message
     await act(async () => {
       if (mockEventSource && mockEventSource.addEventListener) {
-        const messageHandler = (mockEventSource.addEventListener as any).mock.calls
-          .find((call: any[]) => call[0] === 'message')?.[1];
+        const messageHandler = (
+          mockEventSource.addEventListener as any
+        ).mock.calls.find((call: any[]) => call[0] === "message")?.[1];
         if (messageHandler) {
           messageHandler({ data: '{"status":"ok"}' });
         }

@@ -163,8 +163,8 @@ resourceQuota:
 # Cache configuration
 cache:
   enabled: true
-  maxAge: 3600  # 1 hour
-  sMaxAge: 86400  # 1 day for browser cache
+  maxAge: 3600 # 1 hour
+  sMaxAge: 86400 # 1 day for browser cache
 
 # Analytics and monitoring
 monitoring:

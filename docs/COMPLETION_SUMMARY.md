@@ -16,7 +16,7 @@
 - [x] **Task 24**: Next.js setup with TypeScript, Tailwind, Apollo Client
 - [x] **Task 25**: Auth pages (login, register) with form validation
 - [x] **Task 26**: Dashboard with project listing and creation modal
-- [x] **Task 27**: Research form with query, LLM provider, depth, documents  
+- [x] **Task 27**: Research form with query, LLM provider, depth, documents
 - [x] **Task 28**: Live job monitoring with agent status visualization
 - [x] **Task 29**: Report page with Markdown rendering, TOC, and chat integration
 - [x] **Task 30**: Chat panel component with message history and streaming
@@ -62,10 +62,12 @@
 **Coverage:** 21 property tests
 
 **Test Coverage:**
+
 - State invariants (13 tests): Initial state creation, immutability, planner output (3-5 sub-questions), critic score bounds (0-10), routing logic, workflow progression, agent logs, query persistence, revision limits (max 3), type safety, graph compilation, document handling
 - Workflow execution (9 tests): Long queries, variable document counts, state immutability, async execution
 
 **Key Features:**
+
 - Hypothesis `@given` decorators generate 100+ test cases per test
 - Custom strategies for query text, research depth, document IDs
 - Exhaustive input space coverage
@@ -77,11 +79,12 @@
 
 ### **Task 32: Frontend Unit Tests** ✅
 
-**Location:** `/frontend/` (vitest.config.ts, src/tests/, **/*.test.ts/tsx)
+**Location:** `/frontend/` (vitest.config.ts, src/tests/, **/\*.test.ts/tsx)
 **Framework:** Vitest + React Testing Library
-**Coverage:** 66 tests across 6 files, 70% minimum threshold
+**Coverage:\*\* 66 tests across 6 files, 70% minimum threshold
 
 **Test Files & Coverage:**
+
 1. `useAuth.test.ts` (7 tests): State initialization, token restore, set/logout, isAuthenticated
 2. `useSSE.test.ts` (11 tests): Connection, message handling, error/reconnection, close
 3. `useApiClient.test.ts` (10 tests): Axios setup, auth headers, 401 logout, GraphQL support
@@ -90,6 +93,7 @@
 6. `LoginPage.test.tsx` (13 tests): Form inputs, validation, submit, errors, redirect
 
 **Mocking Strategy:**
+
 - Apollo Client: useMutation, useQuery
 - Next.js: useRouter, useSearchParams
 - Hooks: useAuth, useApiClient
@@ -106,11 +110,13 @@
 **Coverage:** 57 tests across 6 files + base infrastructure, 80% minimum
 
 **Test Base Infrastructure:**
+
 - `TestContainerBase.java`: Static Testcontainers (PostgreSQL 15 + Redis 7)
 - `IntegrationTest.java`: @SpringBootTest + @Testcontainers annotation
 - `application-test.yml`: Test profile configuration
 
 **Test Files & Coverage:**
+
 1. `AuthServiceIntegrationTest` (12 tests): Registration, login, password, token refresh, JWT claims, account lockout
 2. `ProjectServiceIntegrationTest` (9 tests): CRUD, ownership isolation, timestamps, archival
 3. `ResearchJobServiceIntegrationTest` (10 tests): Job lifecycle, status transitions, enums, failure handling
@@ -119,6 +125,7 @@
 6. `RateLimitServiceIntegrationTest` (7 tests): Redis sliding window, user isolation, reset
 
 **Database Isolation:**
+
 - Fresh Testcontainers per test class
 - Automatic cleanup via @BeforeEach
 - Seeds test data with known state
@@ -134,12 +141,14 @@
 **Coverage:** 36 tests across 8 suites covering complete user journeys
 
 **Test Configuration:**
+
 - Browsers: Chromium, Firefox, WebKit
 - Mobile: Pixel 5, iPhone 12
 - Failures: Screenshot + video captured
 - Dev server: auto-start on port 3000
 
 **Test Scenarios (8 Suites):**
+
 1. **Auth Flow** (4 tests): Register → Login flow, invalid login, logout
 2. **Project Management** (3 tests): Create project, view details, ownership isolation
 3. **Research Workflow** (3 tests): Submit query, monitor progress, completion redirect
@@ -150,6 +159,7 @@
 8. **Utilities**: Setup/teardown, helper functions
 
 **Coverage:**
+
 - Complete user journeys from fresh registration to report viewing
 - Authentication flow validation
 - Multi-step workflows (project → job → report)
@@ -207,6 +217,7 @@
    - Private subnets for database/cache (no direct internet)
 
 **Configuration:**
+
 - 25 variables (region, instance types, storage, EKS config)
 - S3 + DynamoDB backend for state management
 - terraform.tfvars.example for default values
@@ -223,12 +234,14 @@
 **Structure:** Parent chart + 3 service subcharts
 
 **Parent Chart** (`helm/Chart.yaml`, `helm/values.yaml`):
+
 - Global configuration for all 3 services
 - Environment, registry, ingress, TLS settings
 - Service enable/disable flags
 - Ingress: NGINX class, cert-manager, letsencrypt-prod
 
 **Meridian API Subchart** (meridian-api/) - ✅ COMPLETE:
+
 - 60+ configuration options (replicas, HPA, resources, probes)
 - Deployment: liveness/readiness probes, security contexts, secret injection
 - Service: ClusterIP on port 8080
@@ -239,6 +252,7 @@
 - Helpers: Template functions for labels, selectors, chart name
 
 **Meridian AI Subchart** (meridian-ai/) - ✅ COMPLETE:
+
 - 60+ configuration options (replicas, probes, persistence)
 - Deployment: init containers for dependency checks (Redis, DB)
 - liveness/readiness/startup probes
@@ -250,6 +264,7 @@
 - NetworkPolicy with egress to RDS, Redis, DNS, HTTPS
 
 **Meridian Frontend Subchart** (meridian-frontend/) - ✅ COMPLETE:
+
 - 50+ configuration options
 - Deployment: Next.js with .next cache in emptyDir
 - Service: ClusterIP on port 3000
@@ -261,6 +276,7 @@
 - Caching: Cache-Control headers (1h page, 1d browser)
 
 **Common Features:**
+
 - All subcharts follow Helm best practices
 - Security contexts: non-root user 1000, read-only FS, no privilege escalation
 - Resource limits & requests
@@ -271,13 +287,14 @@
 - Secrets for sensitive data (base64 encoded)
 
 **Templates:**
+
 - deployment.yaml: Full Kubernetes spec with probes, affinity, security
 - service.yaml: ClusterIP service definitions
 - ingress.yaml: NGINX ingress with TLS
 - hpa.yaml: HorizontalPodAutoscaler with behavior policies
 - configmap.yaml: Environment variable management
 - secret.yaml: Optional secret creation
-- _helpers.tpl: Helm template helpers
+- \_helpers.tpl: Helm template helpers
 
 **Status:** ✅ Production-ready, deployable via `helm install meridian ./helm`
 
@@ -358,6 +375,7 @@
 | Workflow dispatch | Any | Deploy to specified environment |
 
 **Performance:**
+
 - CI (lint, build, test): 8-12 minutes
 - Container builds: 5-8 minutes (parallel 3-way)
 - Terraform: 5-10 minutes
@@ -378,6 +396,7 @@
 **Verification Checklist:**
 
 ✅ **Backend (Spring Boot)**
+
 - [x] All 6 integration test suites (57 total tests) defined
 - [x] JaCoCo coverage target: 80%
 - [x] GraphQL schema complete with mutations, queries, subscriptions
@@ -388,6 +407,7 @@
 - [x] Gradle build configuration with all dependencies
 
 ✅ **AI Service (FastAPI)**
+
 - [x] 21 property-based tests with Hypothesis
 - [x] 5-agent LangGraph orchestration complete
 - [x] SSE event streaming with Redis Streams
@@ -398,6 +418,7 @@
 - [x] Mock LLM provider for development
 
 ✅ **Frontend (Next.js)**
+
 - [x] 66 unit tests with Vitest + React Testing Library
 - [x] 36 E2E tests with Playwright
 - [x] Auth pages (login, register) with validation
@@ -410,6 +431,7 @@
 - [x] Tailwind CSS styling applied throughout
 
 ✅ **Infrastructure (Terraform)**
+
 - [x] Production-ready VPC with 3 AZs (public/private subnets)
 - [x] Multi-AZ RDS PostgreSQL 15 with pgvector
 - [x] Multi-AZ ElastiCache Redis 7 with failover
@@ -423,6 +445,7 @@
 - [x] 20 outputs for service connectivity
 
 ✅ **Kubernetes (Helm)**
+
 - [x] Parent chart with global configuration
 - [x] meridian-api subchart (Spring Boot) with probes, HPA, network policies
 - [x] meridian-ai subchart (FastAPI) with long timeouts, dependency checks
@@ -435,6 +458,7 @@
 - [x] NetworkPolicies for traffic control
 
 ✅ **CI/CD (GitHub Actions)**
+
 - [x] CI workflow: lint, test, coverage scan, security analysis
 - [x] Deploy workflow: Terraform plan/apply, Helm deployment, E2E tests
 - [x] Security scanning: Trivy + CodeQL
@@ -448,6 +472,7 @@
 - [x] Comprehensive workflows documentation
 
 ✅ **Documentation**
+
 - [x] IMPLEMENTATION_STATUS.md: Complete task status (37/37)
 - [x] README.md: Project overview and setup
 - [x] QUICKSTART.md: Development and deployment guide
@@ -462,6 +487,7 @@
 ## Build & Test Commands
 
 ### Local Development
+
 ```bash
 # Setup
 cd meridian
@@ -477,6 +503,7 @@ make test           # All tests
 ```
 
 ### CI/CD Execution
+
 ```bash
 # Backend
 cd api && ./gradlew test integrationTest jacocoTestReport
@@ -489,6 +516,7 @@ cd frontend && npm test && npm run test:e2e
 ```
 
 ### Infrastructure Deployment
+
 ```bash
 # Terraform
 cd infra/terraform
@@ -505,13 +533,13 @@ helm install meridian ./helm \
 
 ## Coverage Summary
 
-| Component | Framework | Tests | Coverage | Status |
-|-----------|-----------|-------|----------|--------|
-| Backend | JUnit 5 + Testcontainers | 57 | 80% | ✅ Complete |
-| AI Service | Hypothesis + pytest | 21 | 75% | ✅ Complete |
-| Frontend | Vitest + RTL | 66 | 70% | ✅ Complete |
-| Frontend E2E | Playwright | 36 | Full flows | ✅ Complete |
-| **Total** | | **180+** | **High** | **✅ 100%** |
+| Component    | Framework                | Tests    | Coverage   | Status      |
+| ------------ | ------------------------ | -------- | ---------- | ----------- |
+| Backend      | JUnit 5 + Testcontainers | 57       | 80%        | ✅ Complete |
+| AI Service   | Hypothesis + pytest      | 21       | 75%        | ✅ Complete |
+| Frontend     | Vitest + RTL             | 66       | 70%        | ✅ Complete |
+| Frontend E2E | Playwright               | 36       | Full flows | ✅ Complete |
+| **Total**    |                          | **180+** | **High**   | **✅ 100%** |
 
 ---
 

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { useApiClient } from '@/hooks/useApiClient';
-import Navigation from '@/components/Navigation';
-import Link from 'next/link';
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useApiClient } from "@/hooks/useApiClient";
+import Navigation from "@/components/Navigation";
+import Link from "next/link";
 
 interface Project {
   id: string;
@@ -24,15 +24,15 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDesc, setNewProjectDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [isAuthenticated, router]);
 
@@ -45,10 +45,8 @@ export default function DashboardPage() {
       setError(null);
 
       try {
-        const response = await apiClient.post(
-          '/graphql',
-          {
-            query: `
+        const response = await apiClient.post("/graphql", {
+          query: `
               query GetProjects {
                 projects {
                   id
@@ -60,15 +58,16 @@ export default function DashboardPage() {
                 }
               }
             `,
-          }
-        );
+        });
 
         if (response.data?.projects) {
-          setProjects(response.data.projects.filter((p: Project) => !p.isArchived));
+          setProjects(
+            response.data.projects.filter((p: Project) => !p.isArchived),
+          );
         }
       } catch (err) {
-        console.error('Failed to load projects:', err);
-        setError('Failed to load projects');
+        console.error("Failed to load projects:", err);
+        setError("Failed to load projects");
       } finally {
         setLoading(false);
       }
@@ -82,22 +81,20 @@ export default function DashboardPage() {
     setError(null);
 
     if (!newProjectName.trim()) {
-      setError('Project name is required');
+      setError("Project name is required");
       return;
     }
 
     if (newProjectName.length > 100) {
-      setError('Project name must be less than 100 characters');
+      setError("Project name must be less than 100 characters");
       return;
     }
 
     setCreating(true);
 
     try {
-      const response = await apiClient.post(
-        '/graphql',
-        {
-          query: `
+      const response = await apiClient.post("/graphql", {
+        query: `
             mutation CreateProject($input: CreateProjectInput!) {
               createProject(input: $input) {
                 id
@@ -106,14 +103,13 @@ export default function DashboardPage() {
               }
             }
           `,
-          variables: {
-            input: {
-              name: newProjectName,
-              description: newProjectDesc || null,
-            },
+        variables: {
+          input: {
+            name: newProjectName,
+            description: newProjectDesc || null,
           },
-        }
-      );
+        },
+      });
 
       if (response.data?.createProject?.id) {
         const newProject: Project = {
@@ -126,19 +122,19 @@ export default function DashboardPage() {
         };
         setProjects([newProject, ...projects]);
         setShowCreateModal(false);
-        setNewProjectName('');
-        setNewProjectDesc('');
+        setNewProjectName("");
+        setNewProjectDesc("");
       }
     } catch (err: any) {
-      console.error('Create project error:', err);
-      setError(err?.message || 'Failed to create project');
+      console.error("Create project error:", err);
+      setError(err?.message || "Failed to create project");
     } finally {
       setCreating(false);
     }
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No activity';
+    if (!dateString) return "No activity";
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -189,8 +185,14 @@ export default function DashboardPage() {
               <div className="inline-block">
                 <div className="flex gap-1">
                   <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div
+                    className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                    style={{ animationDelay: "0.2s" }}
+                  ></div>
+                  <div
+                    className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                    style={{ animationDelay: "0.4s" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -212,12 +214,19 @@ export default function DashboardPage() {
                   href={`/projects/${project.id}`}
                   className="block bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg p-6 transition"
                 >
-                  <h3 className="text-lg font-semibold mb-2 line-clamp-2">{project.name}</h3>
+                  <h3 className="text-lg font-semibold mb-2 line-clamp-2">
+                    {project.name}
+                  </h3>
                   {project.description && (
-                    <p className="text-slate-400 text-sm mb-4 line-clamp-2">{project.description}</p>
+                    <p className="text-slate-400 text-sm mb-4 line-clamp-2">
+                      {project.description}
+                    </p>
                   )}
                   <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>📊 {project.jobCount} research job{project.jobCount !== 1 ? 's' : ''}</span>
+                    <span>
+                      📊 {project.jobCount} research job
+                      {project.jobCount !== 1 ? "s" : ""}
+                    </span>
                     <span>⏰ {formatDate(project.lastActivityAt)}</span>
                   </div>
                 </Link>
@@ -234,7 +243,9 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold mb-4">New Project</h2>
             <form onSubmit={handleCreateProject} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Project Name *</label>
+                <label className="block text-sm font-medium mb-2">
+                  Project Name *
+                </label>
                 <input
                   type="text"
                   value={newProjectName}
@@ -245,7 +256,9 @@ export default function DashboardPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Description (Optional)</label>
+                <label className="block text-sm font-medium mb-2">
+                  Description (Optional)
+                </label>
                 <textarea
                   value={newProjectDesc}
                   onChange={(e) => setNewProjectDesc(e.target.value)}
@@ -261,7 +274,7 @@ export default function DashboardPage() {
                   disabled={creating}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition"
                 >
-                  {creating ? 'Creating...' : 'Create'}
+                  {creating ? "Creating..." : "Create"}
                 </button>
                 <button
                   type="button"

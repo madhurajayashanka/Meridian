@@ -1,23 +1,29 @@
 # GitHub CODEOWNERS
+
 # This file defines who should review specific parts of the codebase
+
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Global owners for entire repo
-* @meridian-research/maintainers
+
+- @meridian-research/maintainers
 
 # Backend (Spring Boot)
+
 /api/ @meridian-research/backend-team
 /api/src/main/java/com/meridian/auth/ @meridian-research/backend-team
 /api/src/main/java/com/meridian/config/ @meridian-research/infrastructure-team
 /api/src/test/ @meridian-research/backend-team
 
 # AI Service (FastAPI)
+
 /ai-service/ @meridian-research/ai-team
 /ai-service/app/agents/ @meridian-research/ai-team
 /ai-service/app/rag/ @meridian-research/ai-team
 /ai-service/tests/test_workflow_properties.py @meridian-research/qa-team
 
 # Frontend (Next.js)
+
 /frontend/ @meridian-research/frontend-team
 /frontend/src/app/ @meridian-research/frontend-team
 /frontend/src/components/ @meridian-research/frontend-team
@@ -25,20 +31,24 @@
 /frontend/e2e/ @meridian-research/qa-team
 
 # Infrastructure
+
 /infra/terraform/ @meridian-research/infrastructure-team
 /helm/ @meridian-research/infrastructure-team
 /docker-compose.yml @meridian-research/infrastructure-team
 
 # CI/CD
+
 /.github/workflows/ @meridian-research/devops-team
 /.github/ @meridian-research/devops-team
 
 # Documentation
-*.md @meridian-research/maintainers
+
+\*.md @meridian-research/maintainers
 IMPLEMENTATION_STATUS.md @meridian-research/maintainers
 QUICKSTART.md @meridian-research/maintainers
 
 # Dependency files
+
 package.json @meridian-research/frontend-team
 package-lock.json @meridian-research/frontend-team
 requirements.txt @meridian-research/ai-team

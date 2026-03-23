@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useApiClient } from '@/hooks/useApiClient';
-import { useAuth } from '@/hooks/useAuth';
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { useApiClient } from "@/hooks/useApiClient";
+import { useAuth } from "@/hooks/useAuth";
 
 // Mock axios
-vi.mock('axios', () => ({
+vi.mock("axios", () => ({
   default: {
     create: vi.fn(() => ({
       interceptors: {
@@ -20,37 +20,37 @@ vi.mock('axios', () => ({
 }));
 
 // Mock useAuth
-vi.mock('@/hooks/useAuth', () => ({
+vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
-describe('useApiClient Hook', () => {
+describe("useApiClient Hook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useAuth as any).mockReturnValue({
-      accessToken: 'test-token',
+      accessToken: "test-token",
       logout: vi.fn(),
     });
   });
 
-  it('should create axios instance with authorization header', () => {
+  it("should create axios instance with authorization header", () => {
     const { result } = renderHook(() => useApiClient());
 
     expect(result.current).toBeDefined();
     expect(useAuth).toHaveBeenCalled();
   });
 
-  it('should add authorization header to requests', async () => {
+  it("should add authorization header to requests", async () => {
     const { result } = renderHook(() => useApiClient());
 
     // The actual header injection happens in interceptors
     expect(useAuth).toHaveBeenCalled();
   });
 
-  it('should handle 401 errors by logging out', async () => {
+  it("should handle 401 errors by logging out", async () => {
     const mockLogout = vi.fn();
     (useAuth as any).mockReturnValue({
-      accessToken: 'test-token',
+      accessToken: "test-token",
       logout: mockLogout,
     });
 
@@ -60,8 +60,8 @@ describe('useApiClient Hook', () => {
     expect(useAuth).toHaveBeenCalled();
   });
 
-  it('should use access token for authenticated requests', () => {
-    const testToken = 'specific-token-123';
+  it("should use access token for authenticated requests", () => {
+    const testToken = "specific-token-123";
     (useAuth as any).mockReturnValue({
       accessToken: testToken,
       logout: vi.fn(),
@@ -72,7 +72,7 @@ describe('useApiClient Hook', () => {
     expect(useAuth).toHaveBeenCalled();
   });
 
-  it('should handle null access token gracefully', () => {
+  it("should handle null access token gracefully", () => {
     (useAuth as any).mockReturnValue({
       accessToken: null,
       logout: vi.fn(),
@@ -83,11 +83,11 @@ describe('useApiClient Hook', () => {
     expect(result.current).toBeDefined();
   });
 
-  it('should recreate instance when token changes', () => {
+  it("should recreate instance when token changes", () => {
     const { rerender } = renderHook(() => useApiClient());
 
     (useAuth as any).mockReturnValue({
-      accessToken: 'new-token',
+      accessToken: "new-token",
       logout: vi.fn(),
     });
 
@@ -96,9 +96,9 @@ describe('useApiClient Hook', () => {
     expect(useAuth).toHaveBeenCalled();
   });
 
-  it('should support GraphQL queries', async () => {
+  it("should support GraphQL queries", async () => {
     (useAuth as any).mockReturnValue({
-      accessToken: 'test-token',
+      accessToken: "test-token",
       logout: vi.fn(),
     });
 
@@ -107,21 +107,21 @@ describe('useApiClient Hook', () => {
     expect(result.current).toBeDefined();
   });
 
-  it('should support GET requests', async () => {
+  it("should support GET requests", async () => {
     const { result } = renderHook(() => useApiClient());
 
     expect(result.current).toBeDefined();
   });
 
-  it('should support POST requests', async () => {
+  it("should support POST requests", async () => {
     const { result } = renderHook(() => useApiClient());
 
     expect(result.current).toBeDefined();
   });
 
-  it('should handle network errors', async () => {
+  it("should handle network errors", async () => {
     (useAuth as any).mockReturnValue({
-      accessToken: 'test-token',
+      accessToken: "test-token",
       logout: vi.fn(),
     });
 
@@ -130,13 +130,13 @@ describe('useApiClient Hook', () => {
     expect(result.current).toBeDefined();
   });
 
-  it('should include Content-Type for POST requests', () => {
+  it("should include Content-Type for POST requests", () => {
     const { result } = renderHook(() => useApiClient());
 
     expect(result.current).toBeDefined();
   });
 
-  it('should maintain consistent configuration across requests', () => {
+  it("should maintain consistent configuration across requests", () => {
     const { result: result1 } = renderHook(() => useApiClient());
     const { result: result2 } = renderHook(() => useApiClient());
 

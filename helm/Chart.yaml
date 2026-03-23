@@ -11,12 +11,12 @@ dependencies:
     version: "1.0.0"
     repository: "file://./meridian-api"
     condition: meridian-api.enabled
-  
+
   - name: meridian-ai
     version: "1.0.0"
     repository: "file://./meridian-ai"
     condition: meridian-ai.enabled
-  
+
   - name: meridian-frontend
     version: "1.0.0"
     repository: "file://./meridian-frontend"

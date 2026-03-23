@@ -32,7 +32,7 @@ securityContext:
     drop:
       - ALL
   readOnlyRootFilesystem: true
-  
+
 service:
   type: ClusterIP
   port: 8000
@@ -161,22 +161,22 @@ networkPolicy:
         - podSelector: {}
       ports:
         - protocol: TCP
-          port: 5432  # PostgreSQL
+          port: 5432 # PostgreSQL
     - to:
         - podSelector: {}
       ports:
         - protocol: TCP
-          port: 6379  # Redis
+          port: 6379 # Redis
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: TCP
-          port: 53   # DNS
+          port: 53 # DNS
         - protocol: UDP
-          port: 53   # DNS
+          port: 53 # DNS
     - ports:
         - protocol: TCP
-          port: 443  # HTTPS for external APIs
+          port: 443 # HTTPS for external APIs
 
 # Resource quotas for the namespace
 resourceQuota:

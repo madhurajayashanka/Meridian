@@ -18,7 +18,7 @@ spring:
   security:
     jwt:
       secret: test-secret-key-for-testing-only-1234567890123456789012345678901
-      expiration: 900000  # 15 minutes in milliseconds
+      expiration: 900000 # 15 minutes in milliseconds
 
   graphql:
     graphiql:

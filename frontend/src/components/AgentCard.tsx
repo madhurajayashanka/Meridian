@@ -45,7 +45,9 @@ export function AgentCard({
   const config = statusConfig[status];
 
   return (
-    <div className={`${config.bg} border border-slate-600 rounded-lg p-4 transition-all duration-300`}>
+    <div
+      className={`${config.bg} border border-slate-600 rounded-lg p-4 transition-all duration-300`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -60,7 +62,9 @@ export function AgentCard({
             {name.replace("_", " ")}
           </h3>
         </div>
-        <span className={`text-xs px-3 py-1 rounded-full bg-slate-700 ${config.text}`}>
+        <span
+          className={`text-xs px-3 py-1 rounded-full bg-slate-700 ${config.text}`}
+        >
           {status.toUpperCase()}
         </span>
       </div>

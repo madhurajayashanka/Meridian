@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useAuth } from '@/hooks/useAuth';
-import * as localStorage from '@/utils/localStorage';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useAuth } from "@/hooks/useAuth";
+import * as localStorage from "@/utils/localStorage";
 
 // Mock localStorage
-vi.mock('@/utils/localStorage', () => ({
+vi.mock("@/utils/localStorage", () => ({
   __esModule: true,
   getToken: vi.fn(),
   setToken: vi.fn(),
@@ -14,12 +14,12 @@ vi.mock('@/utils/localStorage', () => ({
   removeRefreshToken: vi.fn(),
 }));
 
-describe('useAuth Hook', () => {
+describe("useAuth Hook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with null values when no token stored', () => {
+  it("should initialize with null values when no token stored", () => {
     (localStorage.getToken as any).mockReturnValue(null);
     (localStorage.getRefreshToken as any).mockReturnValue(null);
 
@@ -30,9 +30,9 @@ describe('useAuth Hook', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it('should restore tokens from storage on mount', () => {
-    const mockToken = 'test-access-token';
-    const mockRefreshToken = 'test-refresh-token';
+  it("should restore tokens from storage on mount", () => {
+    const mockToken = "test-access-token";
+    const mockRefreshToken = "test-refresh-token";
     (localStorage.getToken as any).mockReturnValue(mockToken);
     (localStorage.getRefreshToken as any).mockReturnValue(mockRefreshToken);
 
@@ -43,14 +43,14 @@ describe('useAuth Hook', () => {
     expect(result.current.isAuthenticated).toBe(true);
   });
 
-  it('should set tokens and persist to storage on login', async () => {
+  it("should set tokens and persist to storage on login", async () => {
     const { result } = renderHook(() => useAuth());
 
     const tokens = {
-      accessToken: 'new-access-token',
-      refreshToken: 'new-refresh-token',
-      email: 'user@example.com',
-      name: 'Test User',
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
+      email: "user@example.com",
+      name: "Test User",
     };
 
     await act(async () => {
@@ -58,11 +58,13 @@ describe('useAuth Hook', () => {
     });
 
     expect(localStorage.setToken).toHaveBeenCalledWith(tokens.accessToken);
-    expect(localStorage.setRefreshToken).toHaveBeenCalledWith(tokens.refreshToken);
+    expect(localStorage.setRefreshToken).toHaveBeenCalledWith(
+      tokens.refreshToken,
+    );
   });
 
-  it('should clear tokens on logout', async () => {
-    (localStorage.getToken as any).mockReturnValue('test-token');
+  it("should clear tokens on logout", async () => {
+    (localStorage.getToken as any).mockReturnValue("test-token");
 
     const { result } = renderHook(() => useAuth());
 
@@ -76,14 +78,14 @@ describe('useAuth Hook', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it('should expose userId and email from store', async () => {
+  it("should expose userId and email from store", async () => {
     const { result } = renderHook(() => useAuth());
 
     const tokens = {
-      accessToken: 'token',
-      refreshToken: 'refresh',
-      email: 'test@example.com',
-      name: 'Test',
+      accessToken: "token",
+      refreshToken: "refresh",
+      email: "test@example.com",
+      name: "Test",
       userId: 123,
     };
 
@@ -91,18 +93,18 @@ describe('useAuth Hook', () => {
       result.current.setTokens(tokens);
     });
 
-    expect(result.current.email).toBe('test@example.com');
+    expect(result.current.email).toBe("test@example.com");
   });
 
-  it('should indicate authenticated state correctly', async () => {
+  it("should indicate authenticated state correctly", async () => {
     const { result } = renderHook(() => useAuth());
 
     expect(result.current.isAuthenticated).toBe(false);
 
     await act(async () => {
       result.current.setTokens({
-        accessToken: 'token',
-        refreshToken: 'refresh',
+        accessToken: "token",
+        refreshToken: "refresh",
       });
     });
 

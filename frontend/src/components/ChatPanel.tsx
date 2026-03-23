@@ -28,7 +28,9 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
     // Load initial messages
     const loadMessages = async () => {
       try {
-        const response = await client.get(`/api/v1/reports/${reportId}/messages`);
+        const response = await client.get(
+          `/api/v1/reports/${reportId}/messages`,
+        );
         setMessages(response.data || []);
       } catch (err) {
         console.error("Failed to load messages:", err);
@@ -67,17 +69,14 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
 
     try {
       // Stream the response
-      const response = await fetch(
-        `/api/v1/reports/${reportId}/chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${client.getAccessToken()}`,
-          },
-          body: JSON.stringify({ message: userMessage }),
-        }
-      );
+      const response = await fetch(`/api/v1/reports/${reportId}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${client.getAccessToken()}`,
+        },
+        body: JSON.stringify({ message: userMessage }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to get response");
@@ -112,7 +111,8 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
         ]);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send message";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to send message";
       setError(errorMessage);
       console.error("Error sending message:", err);
 
@@ -127,8 +127,12 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
     <div className="flex flex-col h-full bg-slate-800 rounded-lg border border-slate-700">
       {/* Header */}
       <div className="px-6 py-4 border-b border-slate-700">
-        <h3 className="text-lg font-semibold text-white">Ask About This Report</h3>
-        <p className="text-sm text-slate-400 mt-1">Get answers based on the report content</p>
+        <h3 className="text-lg font-semibold text-white">
+          Ask About This Report
+        </h3>
+        <p className="text-sm text-slate-400 mt-1">
+          Get answers based on the report content
+        </p>
       </div>
 
       {/* Messages List */}
@@ -137,7 +141,9 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
           <div className="flex items-center justify-center h-full text-center">
             <div>
               <p className="text-slate-400">No messages yet</p>
-              <p className="text-sm text-slate-500 mt-2">Ask a question to get started</p>
+              <p className="text-sm text-slate-500 mt-2">
+                Ask a question to get started
+              </p>
             </div>
           </div>
         )}
@@ -206,7 +212,7 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
           <button
             type="submit"
             disabled={disabled || isLoading || !input.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-medium rounded-lg transition duration-200"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-medium rounded-lg transition duration-200"
           >
             {isLoading ? "..." : "Send"}
           </button>

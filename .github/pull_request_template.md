@@ -1,37 +1,47 @@
 ## Description
+
 <!-- Provide a brief description of your changes -->
 
 ## Type of Change
+
 - [ ] Bug fix (non-breaking change which fixes an issue)
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
 
 ## Changes Made
+
 <!-- List the specific changes made in this PR -->
-- 
-- 
+
+-
+-
 
 ## Testing
+
 <!-- Describe the tests you ran and how to reproduce -->
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] E2E tests added/updated
 - [ ] Manual testing performed
 
 ### Test Coverage
+
 - [ ] Maintained/increased existing test coverage
-- [ ] Coverage: ~__% (check workflow results)
+- [ ] Coverage: ~\_\_% (check workflow results)
 
 ### How to Test
-1. 
-2. 
-3. 
+
+1.
+2.
+3.
 
 ## Screenshots/Recordings
+
 <!-- If applicable, add screenshots or recordings of the UI changes -->
 
 ## Checklist
+
 - [ ] My code follows the style guidelines of this project
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
@@ -42,24 +52,35 @@
 - [ ] Any dependent changes have been merged and published
 
 ## Dependencies
+
 <!-- List any new dependencies added -->
-- 
+
+-
 
 ## Breaking Changes
+
 <!-- Describe any breaking changes and migration path if applicable -->
-- 
+
+-
 
 ## Performance Impact
+
 <!-- Describe any performance implications -->
-- 
+
+-
 
 ## Related Issues
+
 <!-- Link to related issues: closes #123 -->
+
 Closes #
 
 ## Reviewers
+
 <!-- Tag reviewers if needed -->
+
 @username
 
 ## Additional Notes
+
 <!-- Any additional context or notes for reviewers -->

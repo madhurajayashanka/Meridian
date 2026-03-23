@@ -7,6 +7,7 @@ This directory contains Terraform configuration to deploy the Meridian platform 
 The Terraform configuration creates the following infrastructure:
 
 ### Networking
+
 - **VPC**: Custom VPC with configurable CIDR block
 - **Subnets**: 3 public and 3 private subnets across availability zones
 - **NAT Gateway**: For private subnet internet access
@@ -14,6 +15,7 @@ The Terraform configuration creates the following infrastructure:
 - **Route Tables**: Proper routing for public and private subnets
 
 ### Database
+
 - **RDS PostgreSQL**: Managed PostgreSQL 15 database
   - Multi-AZ deployment for high availability
   - Automated backups with 30-day retention
@@ -22,6 +24,7 @@ The Terraform configuration creates the following infrastructure:
   - pgvector support for semantic search
 
 ### Cache Layer
+
 - **ElastiCache Redis**: Managed Redis cluster
   - Multi-AZ with automatic failover
   - At-rest and in-transit encryption
@@ -30,6 +33,7 @@ The Terraform configuration creates the following infrastructure:
   - CloudWatch alarms for CPU, memory, and evictions
 
 ### Storage
+
 - **S3 Documents Bucket**: For uploaded research documents
   - Versioning enabled
   - KMS encryption
@@ -45,6 +49,7 @@ The Terraform configuration creates the following infrastructure:
   - Automatic cleanup with 90-day retention
 
 ### Security
+
 - **Security Groups**: Properly configured for database, cache, and application layers
 - **KMS Keys**: For encryption at rest
 - **IAM Roles**: For service access (RDS monitoring, EKS pods, EC2 instances)
@@ -82,11 +87,13 @@ aws dynamodb create-table \
 ## Setup
 
 1. **Clone the repository**:
+
 ```bash
 cd infra/terraform
 ```
 
 2. **Create terraform.tfvars**:
+
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 # Edit with your desired values
@@ -94,16 +101,19 @@ vim terraform.tfvars
 ```
 
 3. **Set RDS password environment variable** (recommended):
+
 ```bash
 export TF_VAR_rds_password="YourSecurePassword123"
 ```
 
 4. **Initialize Terraform**:
+
 ```bash
 terraform init
 ```
 
 5. **Validate configuration**:
+
 ```bash
 terraform validate
 ```
@@ -111,16 +121,19 @@ terraform validate
 ## Usage
 
 ### Plan Changes
+
 ```bash
 terraform plan -out=tfplan
 ```
 
 ### Apply Changes
+
 ```bash
 terraform apply tfplan
 ```
 
 ### Destroy Infrastructure
+
 ```bash
 terraform destroy
 ```
@@ -157,6 +170,7 @@ terraform output -json | jq .rds_connection_string.value
 ```
 
 Key outputs:
+
 - `rds_endpoint`: PostgreSQL endpoint
 - `redis_endpoint`: Redis endpoint
 - `documents_bucket_name`: S3 bucket for documents
@@ -193,6 +207,7 @@ CloudWatch dashboards and alarms are configured for:
 ## Troubleshooting
 
 ### State Lock Issues
+
 If you encounter state lock issues:
 
 ```bash
@@ -200,12 +215,14 @@ terraform force-unlock <LOCK_ID>
 ```
 
 ### Terraform Apply Fails
+
 1. Check AWS credentials: `aws sts get-caller-identity`
 2. Verify permissions for creating resources
 3. Check for conflicting resources in AWS account
 4. Review error logs: `terraform apply -lock=false`
 
 ### Connection Issues
+
 Test database connectivity:
 
 ```bash
@@ -239,6 +256,7 @@ After infrastructure is deployed:
 ## Support
 
 For issues or questions:
+
 1. Check Terraform documentation: https://www.terraform.io/docs
 2. Check AWS documentation: https://docs.aws.amazon.com
 3. Review CloudWatch Logs for application errors
