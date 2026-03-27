@@ -23,6 +23,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -167,6 +168,10 @@ public class AuthService {
         return generateAuthResponse(user);
     }
 
+    public AuthResponse refreshToken(String refreshToken) {
+        return refreshToken(RefreshRequest.builder().refreshToken(refreshToken).build());
+    }
+
     /**
      * Change user password (invalidates all refresh tokens).
      * Property 7: Password change invalidates refresh tokens
@@ -195,6 +200,42 @@ public class AuthService {
         refreshTokenRepository.saveAll(tokens);
 
         log.info("Password changed for user: {}, all refresh tokens revoked", userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<User> getUserById(UUID userId) {
+        return userRepository.findByIdActive(userId);
+    }
+
+    public void revokeAllTokensForUser(UUID userId) {
+        User user = userRepository.findByIdActive(userId)
+            .orElseThrow(() -> new UnauthorizedException("User not found"));
+        List<RefreshToken> tokens = refreshTokenRepository.findAllValidTokensByUser(user);
+        tokens.forEach(token -> token.setRevokedAt(LocalDateTime.now()));
+        refreshTokenRepository.saveAll(tokens);
+    }
+
+    public User updateProfile(UUID userId, String name, String avatarUrl) {
+        User user = userRepository.findByIdActive(userId)
+            .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        if (name != null && !name.isBlank()) {
+            user.setName(name.trim());
+        }
+        if (avatarUrl != null) {
+            user.setAvatarUrl(avatarUrl.trim().isEmpty() ? null : avatarUrl.trim());
+        }
+
+        return userRepository.save(user);
+    }
+
+    public void deleteAccount(UUID userId) {
+        User user = userRepository.findByIdActive(userId)
+            .orElseThrow(() -> new UnauthorizedException("User not found"));
+        user.setDeletedAt(LocalDateTime.now());
+        user.setIsActive(false);
+        userRepository.save(user);
+        revokeAllTokensForUser(userId);
     }
 
     // Private helper methods

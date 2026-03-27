@@ -38,37 +38,37 @@ public class Document {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 255)
+    @Column(name = "original_filename", nullable = false, length = 255)
     private String originalFilename;
 
-    @Column(nullable = false, length = 1024)
+    @Column(name = "s3_key", nullable = false, length = 1024)
     private String s3Key;
 
-    @Column(nullable = false, length = 10)
+    @Column(name = "file_type", nullable = false, length = 10)
     private String fileType; // 'pdf' or 'txt'
 
-    @Column(nullable = false)
+    @Column(name = "file_size_bytes", nullable = false)
     private Long fileSizeBytes;
 
     @Column(nullable = false, length = 50)
     @Builder.Default
     private String status = "PROCESSING"; // PROCESSING, READY, FAILED
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
-    @Column
+    @Column(name = "chunk_count")
     private Integer chunkCount;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
     public boolean isSoftDeleted() {

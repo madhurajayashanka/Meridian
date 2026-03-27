@@ -7,6 +7,9 @@ import com.meridian.auth.dto.RegisterRequest;
 import com.meridian.auth.service.AuthService;
 import com.meridian.common.exception.UnauthorizedException;
 import com.meridian.common.exception.ValidationException;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -108,8 +111,3 @@ public class AuthController {
         private String message;
     }
 }
-
-// Import needed for ErrorResponse
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;

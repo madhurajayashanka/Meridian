@@ -7,7 +7,7 @@ COPY pom.xml .
 COPY src src/
 
 # Build application
-RUN mvn -B -DskipTests package
+RUN mvn -B -Dmaven.test.skip=true package
 
 # Runtime image
 FROM eclipse-temurin:21-jdk-alpine

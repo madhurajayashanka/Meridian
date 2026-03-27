@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiClient } from "@/hooks/useApiClient";
-import Navigation from "@/components/Navigation";
-import ChatPanel from "@/components/ChatPanel";
+import { Navigation } from "@/components/Navigation";
+import { ChatPanel } from "@/components/ChatPanel";
 import Link from "next/link";
 
 interface HeadingTOC {
@@ -46,16 +46,14 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableOfContents, setTableOfContents] = useState<HeadingTOC[]>([]);
-  const [showTOC, setShowTOC] = useState(true);
+  const [showTOC] = useState(true);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
     }
   }, [isAuthenticated, router]);
 
-  // Load report
   useEffect(() => {
     const loadReport = async () => {
       if (!jobId) return;
@@ -66,26 +64,26 @@ export default function ReportPage() {
       try {
         const response = await apiClient.post("/graphql", {
           query: `
-              query GetJob($id: ID!) {
-                job(id: $id) {
+            query GetJob($id: ID!) {
+              job(id: $id) {
+                id
+                query
+                status
+                project {
                   id
-                  query
-                  status
-                  project {
-                    id
-                    name
-                  }
-                  report {
-                    id
-                    wordCount
-                    citationCount
-                    criticScore
-                    revisionCount
-                    createdAt
-                  }
+                  name
+                }
+                report {
+                  id
+                  wordCount
+                  citationCount
+                  criticScore
+                  revisionCount
+                  createdAt
                 }
               }
-            `,
+            }
+          `,
           variables: { id: jobId },
         });
 
@@ -98,8 +96,6 @@ export default function ReportPage() {
             job: jobData,
           });
 
-          // In a real implementation, fetch the markdown content from S3 or API
-          // For now, use placeholder content
           const placeholderContent = `
 ## Executive Summary
 
@@ -109,9 +105,9 @@ This report presents comprehensive research into the query provided. The analysi
 
 Based on the research conducted, the following key findings emerged:
 
-- **Finding 1**: The research methodology employed multiple information sources
-- **Finding 2**: Cross-verification was performed to ensure accuracy
-- **Finding 3**: The analysis revealed interconnected patterns across domains
+- Finding 1: The research methodology employed multiple information sources
+- Finding 2: Cross-verification was performed to ensure accuracy
+- Finding 3: The analysis revealed interconnected patterns across domains
 
 ### Sub-finding 1.1
 
@@ -121,11 +117,11 @@ Additional context and supporting evidence for the key findings.
 
 The research was conducted using a multi-agent system:
 
-1. **Planning Phase**: Decomposed the research question into sub-questions
-2. **Research Phase**: Gathered relevant sources and evidence
-3. **Analysis Phase**: Synthesized findings into a coherent narrative
-4. **Critique Phase**: Evaluated the draft for quality and accuracy
-5. **Synthesis Phase**: Generated the final comprehensive report
+1. Planning Phase: Decomposed the research question into sub-questions
+2. Research Phase: Gathered relevant sources and evidence
+3. Analysis Phase: Synthesized findings into a coherent narrative
+4. Critique Phase: Evaluated the draft for quality and accuracy
+5. Synthesis Phase: Generated the final comprehensive report
 
 ## Conclusions
 
@@ -133,10 +129,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
 `;
 
           setReportContent(placeholderContent);
-
-          // Extract table of contents from H2 and H3 headers
-          const headings = extractHeadings(placeholderContent);
-          setTableOfContents(headings);
+          setTableOfContents(extractHeadings(placeholderContent));
         } else {
           setError("Report not found");
         }
@@ -161,12 +154,10 @@ The research demonstrates that thorough investigation combined with AI-assisted 
 
       if (h2Match) {
         const text = h2Match[1];
-        const id = slugify(text);
-        headings.push({ level: 2, text, id });
+        headings.push({ level: 2, text, id: slugify(text) });
       } else if (h3Match) {
         const text = h3Match[1];
-        const id = slugify(text);
-        headings.push({ level: 3, text, id });
+        headings.push({ level: 3, text, id: slugify(text) });
       }
     });
 
@@ -182,14 +173,12 @@ The research demonstrates that thorough investigation combined with AI-assisted 
       .replace(/-+/g, "-");
   };
 
-  const renderMarkdown = (content: string): React.ReactNode => {
-    const paragraphs: React.ReactNode[] = [];
+  const renderMarkdown = (content: string): ReactNode => {
+    const paragraphs: ReactNode[] = [];
     let currentParagraph = "";
-
     const lines = content.split("\n");
 
     lines.forEach((line, index) => {
-      // Headings
       if (line.match(/^## /)) {
         if (currentParagraph) {
           paragraphs.push(
@@ -210,7 +199,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
             id={id}
             className="text-2xl font-bold text-white mt-8 mb-4"
           >
-            {renderInlineMarkdown(title)}
+            {title}
           </h2>,
         );
       } else if (line.match(/^### /)) {
@@ -233,7 +222,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
             id={id}
             className="text-lg font-semibold text-white mt-6 mb-3"
           >
-            {renderInlineMarkdown(title)}
+            {title}
           </h3>,
         );
       } else if (line.match(/^- /)) {
@@ -251,7 +240,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
         const item = line.replace(/^- /, "");
         paragraphs.push(
           <li key={`li${index}`} className="text-slate-300 ml-6 mb-2 list-disc">
-            {renderInlineMarkdown(item)}
+            {item}
           </li>,
         );
       } else if (line.trim()) {
@@ -275,27 +264,6 @@ The research demonstrates that thorough investigation combined with AI-assisted 
     }
 
     return <div>{paragraphs}</div>;
-  };
-
-  const renderInlineMarkdown = (text: string): React.ReactNode => {
-    // Bold
-    let result: React.ReactNode = text;
-    result = text.replace(
-      /\*\*(.+?)\*\*/g,
-      (match, content) => `__${content}__`,
-    );
-
-    // Italic
-    result = result
-      .toString()
-      .replace(/\*(.+?)\*/g, (match, content) => `_${content}_`);
-
-    // Citations
-    result = result
-      .toString()
-      .replace(/\[(\d+)\]/g, (match, number) => `[${number}]`);
-
-    return result;
   };
 
   if (!isAuthenticated) {
@@ -334,7 +302,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
               href="/dashboard"
               className="text-blue-400 hover:text-blue-300 mt-4 inline-block"
             >
-              ← Back to Dashboard
+              Back to Dashboard
             </Link>
           </div>
         </main>
@@ -347,18 +315,16 @@ The research demonstrates that thorough investigation combined with AI-assisted 
       <Navigation />
 
       <main className="max-w-7xl mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="mb-8">
           <Link
             href={`/projects/${report.job.project.id}`}
             className="text-blue-400 hover:text-blue-300 text-sm"
           >
-            ← Back to {report.job.project.name}
+            Back to {report.job.project.name}
           </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar TOC */}
           {showTOC && tableOfContents.length > 0 && (
             <aside className="lg:block hidden">
               <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 sticky top-24">
@@ -384,16 +350,13 @@ The research demonstrates that thorough investigation combined with AI-assisted 
             </aside>
           )}
 
-          {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Report Header */}
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-8 mb-8">
               <h1 className="text-3xl font-bold text-white mb-4">
                 Research Report
               </h1>
               <p className="text-slate-400 mb-6">{report.job.query}</p>
 
-              {/* Report Metadata */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 py-6 border-t border-b border-slate-700">
                 <div>
                   <p className="text-slate-400 text-sm">Words</p>
@@ -436,264 +399,16 @@ The research demonstrates that thorough investigation combined with AI-assisted 
               </div>
             </div>
 
-            {/* Report Content */}
             <article className="max-w-none mb-12">
               {renderMarkdown(reportContent)}
             </article>
 
-            {/* Chat Panel */}
             <div className="mt-16">
               <h2 className="text-2xl font-bold text-white mb-6">
                 Ask Questions About This Report
               </h2>
               <ChatPanel reportId={report.id} />
             </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-const JOB_REPORT_QUERY = gql`
-  query GetJobReport($id: String!) {
-    job(id: $id) {
-      id
-      query
-      status
-      llmProvider
-      researchDepth
-      createdAt
-      completedAt
-      durationMs
-      report {
-        content
-        sources
-        confidence
-        executiveSummary
-      }
-    }
-  }
-`;
-
-export default function JobReportPage() {
-  const router = useRouter();
-  const params = useParams();
-  const jobId = params.id as string;
-
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
-  const { data, loading, error } = useQuery(JOB_REPORT_QUERY, {
-    variables: { id: jobId },
-    skip: !jobId,
-  });
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login?redirect=/dashboard");
-    }
-  }, [isAuthenticated, router]);
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mb-4" />
-          <p className="text-white text-lg">Loading report...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-900">
-        <header className="bg-slate-800 border-b border-slate-700">
-          <div className="max-w-6xl mx-auto px-6 py-4">
-            <Link
-              href="/dashboard"
-              className="text-blue-400 hover:text-blue-300 text-sm mb-2 block"
-            >
-              ← Back to Dashboard
-            </Link>
-            <h1 className="text-2xl font-bold text-white">
-              Error Loading Report
-            </h1>
-          </div>
-        </header>
-        <main className="max-w-6xl mx-auto px-6 py-8">
-          <div className="bg-red-900/20 border border-red-700 rounded-lg p-6">
-            <p className="text-red-400">{error.message}</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  const job = data?.job;
-  const report = job?.report;
-
-  const durationMinutes = job?.durationMs
-    ? Math.round(job.durationMs / 1000 / 60)
-    : 0;
-
-  return (
-    <div className="min-h-screen bg-slate-900">
-      {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <Link
-            href="/dashboard"
-            className="text-blue-400 hover:text-blue-300 text-sm mb-2 block"
-          >
-            ← Back to Dashboard
-          </Link>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Research Report</h1>
-              <p className="text-slate-400 text-sm mt-1">{job?.query}</p>
-            </div>
-            <div className="flex gap-3">
-              <ExportButton jobId={jobId} reportContent={report?.content} />
-              <ShareButton jobId={jobId} />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {/* Job Metadata */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">
-              Provider
-            </p>
-            <p className="text-white font-medium">{job?.llmProvider}</p>
-          </div>
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">
-              Depth
-            </p>
-            <p className="text-white font-medium">{job?.researchDepth}</p>
-          </div>
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">
-              Duration
-            </p>
-            <p className="text-white font-medium">{durationMinutes}m</p>
-          </div>
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">
-              Confidence
-            </p>
-            <p className="text-white font-medium">
-              {report?.confidence
-                ? `${Math.round(report.confidence * 100)}%`
-                : "N/A"}
-            </p>
-          </div>
-        </div>
-
-        {/* Executive Summary */}
-        {report?.executiveSummary && (
-          <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-700/50 rounded-lg p-6 mb-8">
-            <h2 className="text-lg font-semibold text-white mb-3">
-              Executive Summary
-            </h2>
-            <p className="text-slate-300 leading-relaxed">
-              {report.executiveSummary}
-            </p>
-          </div>
-        )}
-
-        {/* Report Content */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 p-8 mb-8">
-          <div className="prose prose-invert max-w-none">
-            {report?.content ? (
-              <MDXContent content={report.content} />
-            ) : (
-              <p className="text-slate-400">No report content available</p>
-            )}
-          </div>
-        </div>
-
-        {/* Sources */}
-        {report?.sources && report.sources.length > 0 && (
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-8">
-            <h2 className="text-lg font-semibold text-white mb-4">Sources</h2>
-            <div className="space-y-3">
-              {report.sources.map((source: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="flex gap-3 p-3 bg-slate-700/50 rounded border border-slate-600 hover:border-blue-500 transition"
-                >
-                  <span className="text-slate-500 text-sm font-medium min-w-fit">
-                    [{idx + 1}]
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">
-                      {typeof source === "string"
-                        ? source
-                        : source.title || source.url}
-                    </p>
-                    {typeof source === "object" && source.url && (
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 text-xs truncate block"
-                      >
-                        {source.url}
-                      </a>
-                    )}
-                  </div>
-                  {typeof source === "object" && source.url && (
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 text-sm font-medium"
-                    >
-                      →
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-slate-700 text-center">
-          <p className="text-slate-500 text-sm">
-            Report generated on{" "}
-            {job?.completedAt
-              ? new Date(job.completedAt).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "N/A"}
-          </p>
-          <div className="flex gap-4 justify-center mt-4">
-            <Link
-              href="/dashboard"
-              className="text-blue-400 hover:text-blue-300 text-sm"
-            >
-              Back to Dashboard
-            </Link>
-            <button
-              onClick={() => window.print()}
-              className="text-blue-400 hover:text-blue-300 text-sm"
-            >
-              Print Report
-            </button>
           </div>
         </div>
       </main>

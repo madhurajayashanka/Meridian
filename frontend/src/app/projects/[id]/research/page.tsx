@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/hooks/useAuth";
-import { gql, useMutation, useQuery } from "@apollo/client";
+import { gql } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client/react";
 import Link from "next/link";
 
 const SUBMIT_JOB_MUTATION = gql`
@@ -45,6 +46,25 @@ const PROJECT_QUERY = gql`
   }
 `;
 
+interface ProjectQueryData {
+  project?: {
+    id: string;
+    name: string;
+    documents?: Array<{
+      id: string;
+      filename: string;
+      status: string;
+      mimeType: string;
+    }>;
+  };
+}
+
+interface SubmitResearchJobData {
+  submitResearchJob: {
+    id: string;
+  };
+}
+
 export default function ResearchFormPage() {
   const router = useRouter();
   const params = useParams();
@@ -58,12 +78,12 @@ export default function ResearchFormPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: projectData } = useQuery(PROJECT_QUERY, {
+  const { data: projectData } = useQuery<ProjectQueryData>(PROJECT_QUERY, {
     variables: { id: projectId },
     skip: !projectId,
   });
 
-  const [submitJob] = useMutation(SUBMIT_JOB_MUTATION, {
+  const [submitJob] = useMutation<SubmitResearchJobData>(SUBMIT_JOB_MUTATION, {
     onCompleted: (data) => {
       router.push(`/jobs/${data.submitResearchJob.id}/live`);
     },
@@ -85,9 +105,9 @@ export default function ResearchFormPage() {
 
   const project = projectData?.project;
   const availableDocs =
-    project?.documents?.filter((doc: any) => doc.status === "COMPLETE") || [];
+    project?.documents?.filter((doc) => doc.status === "COMPLETE") || [];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);

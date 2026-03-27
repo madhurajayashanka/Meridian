@@ -30,7 +30,7 @@ public class ResearchJobGraphQLController {
      */
     @QueryMapping
     public List<ResearchJob> jobs(
-        @Argument(required = false) String projectId
+        @Argument String projectId
     ) {
         UUID userId = getCurrentUserId();
         if (projectId == null || projectId.isEmpty()) {

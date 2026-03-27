@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,7 +16,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "agent_logs", indexes = {
     @Index(name = "idx_agent_logs_job_id", columnList = "job_id"),
-    @Index(name = "idx_agent_logs_agent", columnList = "agent")
+    @Index(name = "idx_agent_logs_agent_name", columnList = "agent_name")
 })
 @Data
 @NoArgsConstructor
@@ -32,23 +32,23 @@ public class AgentLog {
     @Column(nullable = false, columnDefinition = "uuid")
     private UUID jobId;
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "agent_name", nullable = false, length = 100)
     private String agent; // planner|research|analysis|critic|synthesizer
 
     @Column(nullable = false, length = 50)
-    private String status; // running|complete|failed
+    private String status; // RUNNING|COMPLETE|FAILED
 
-    @Column(nullable = false)
-    private Integer progress; // 0-100
+    @Column(name = "input_tokens")
+    private Integer inputTokens;
 
-    @Column(nullable = false)
+    @Column(name = "output_tokens")
+    private Integer outputTokens;
+
+    @Column(name = "duration_ms")
     private Integer durationMs; // Execution time in milliseconds
 
-    @Column(length = 1000)
-    private String error;
-
-    @Column(columnDefinition = "TEXT")
-    private String partialOutput; // JSON string
+    @Column(name = "payload", columnDefinition = "jsonb")
+    private String payload;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false, columnDefinition = "timestamp with time zone")

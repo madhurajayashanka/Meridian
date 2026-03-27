@@ -1,30 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/hooks/useAuth";
-import { gql, useMutation } from "@apollo/client";
 
-const LOGIN_MUTATION = gql`
-  mutation Login($email: String!, $password: String!) {
-    login(email: $email, password: $password) {
-      accessToken
-      refreshToken
-      expiresIn
-      tokenType
-      user {
-        id
-        email
-        name
-      }
-    }
-  }
-`;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [email, setEmail] = useState("");
@@ -32,26 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [loginMutation] = useMutation(LOGIN_MUTATION, {
-    onCompleted: (data) => {
-      const response = data.login;
-      setAuth(
-        response.accessToken,
-        response.refreshToken,
-        response.user.id,
-        response.user.email,
-      );
-
-      const redirectTo = searchParams?.get("redirect") || "/dashboard";
-      router.push(redirectTo);
-    },
-    onError: (err) => {
-      setError(err.message || "Login failed");
-      setIsLoading(false);
-    },
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -76,11 +41,57 @@ export default function LoginPage() {
     }
 
     try {
-      await loginMutation({
-        variables: { email, password },
+      const response = await fetch(`${API_URL}/graphql`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: `
+            mutation Login($email: String!, $password: String!) {
+              login(email: $email, password: $password) {
+                accessToken
+                refreshToken
+                user {
+                  id
+                  email
+                }
+              }
+            }
+          `,
+          variables: { email, password },
+        }),
       });
-    } catch (err) {
-      // Error handled in onError callback
+
+      const payload = await response.json();
+      if (!response.ok || payload.errors?.length) {
+        throw new Error(payload.errors?.[0]?.message || "Login failed");
+      }
+
+      const loginData = payload?.data?.login;
+      if (
+        !loginData?.accessToken ||
+        !loginData?.refreshToken ||
+        !loginData?.user?.id
+      ) {
+        throw new Error("Invalid login response");
+      }
+
+      setAuth(
+        loginData.accessToken,
+        loginData.refreshToken,
+        loginData.user.id,
+        loginData.user.email,
+      );
+
+      const redirectTo =
+        (typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("redirect")
+          : null) || "/dashboard";
+      router.push(redirectTo);
+    } catch (err: any) {
+      setError(err?.message || "Login failed");
+      setIsLoading(false);
     }
   };
 

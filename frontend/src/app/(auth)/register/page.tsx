@@ -1,26 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/hooks/useAuth";
-import { gql, useMutation } from "@apollo/client";
 
-const REGISTER_MUTATION = gql`
-  mutation Register($email: String!, $password: String!, $name: String!) {
-    register(email: $email, password: $password, name: $name) {
-      accessToken
-      refreshToken
-      expiresIn
-      tokenType
-      user {
-        id
-        email
-        name
-      }
-    }
-  }
-`;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,24 +18,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [registerMutation] = useMutation(REGISTER_MUTATION, {
-    onCompleted: (data) => {
-      const response = data.register;
-      setAuth(
-        response.accessToken,
-        response.refreshToken,
-        response.user.id,
-        response.user.email,
-      );
-      router.push("/dashboard");
-    },
-    onError: (err) => {
-      setError(err.message || "Registration failed");
-      setIsLoading(false);
-    },
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -87,11 +55,52 @@ export default function RegisterPage() {
     }
 
     try {
-      await registerMutation({
-        variables: { name, email, password },
+      const response = await fetch(`${API_URL}/graphql`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: `
+            mutation Register($email: String!, $password: String!, $name: String!) {
+              register(email: $email, password: $password, name: $name) {
+                accessToken
+                refreshToken
+                user {
+                  id
+                  email
+                }
+              }
+            }
+          `,
+          variables: { name, email, password },
+        }),
       });
-    } catch (err) {
-      // Error handled in onError callback
+
+      const payload = await response.json();
+      if (!response.ok || payload.errors?.length) {
+        throw new Error(payload.errors?.[0]?.message || "Registration failed");
+      }
+
+      const registerData = payload?.data?.register;
+      if (
+        !registerData?.accessToken ||
+        !registerData?.refreshToken ||
+        !registerData?.user?.id
+      ) {
+        throw new Error("Invalid registration response");
+      }
+
+      setAuth(
+        registerData.accessToken,
+        registerData.refreshToken,
+        registerData.user.id,
+        registerData.user.email,
+      );
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err?.message || "Registration failed");
+      setIsLoading(false);
     }
   };
 

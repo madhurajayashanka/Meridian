@@ -5,7 +5,6 @@ import com.meridian.auth.dto.LoginRequest;
 import com.meridian.auth.dto.RegisterRequest;
 import com.meridian.auth.entity.User;
 import com.meridian.auth.service.AuthService;
-import com.meridian.auth.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -14,8 +13,6 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.UUID;
 
 /**
@@ -27,7 +24,6 @@ import java.util.UUID;
 public class AuthGraphQLController {
 
     private final AuthService authService;
-    private final JwtUtil jwtUtil;
 
     // =========================================================================
     // Queries

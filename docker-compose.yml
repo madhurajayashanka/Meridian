@@ -44,6 +44,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: meridian_dev_password
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      SPRING_MAIN_ALLOW_BEAN_DEFINITION_OVERRIDING: "true"
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       AI_SERVICE_URL: http://ai-service:8080
@@ -59,7 +60,11 @@ services:
     networks:
       - meridian-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8000/actuator/health > /dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -89,7 +94,11 @@ services:
     networks:
       - meridian-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8080/health > /dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

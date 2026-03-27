@@ -16,7 +16,6 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@/components/*": ["./src/components/*"],
@@ -27,8 +26,22 @@
       "@/styles/*": ["./src/styles/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "dist", ".next"],
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    "e2e",
+    "src/tests",
+    "src/**/__tests__/**",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ],
   "ts-node": {
     "compilerOptions": {
       "module": "commonjs"

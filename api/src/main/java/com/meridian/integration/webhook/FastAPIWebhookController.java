@@ -1,18 +1,131 @@
 package com.meridian.integration.webhook;
 
-import com.meridian.job.service.JobService;
+import com.meridian.job.service.ResearchJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * FastAPI Webhook Controller
- * Receives status update webhooks from FastAPI AI service
- *
- * Endpoints:\n * - POST /api/webhooks/jobs/{jobId}/status - Job status update\n * - POST /api/webhooks/jobs/{jobId}/complete - Job completion\n * - POST /api/webhooks/jobs/{jobId}/failed - Job failure\n */\n@RestController\n@RequestMapping(\"/api/webhooks\")\n@RequiredArgsConstructor\n@Slf4j\npublic class FastAPIWebhookController {\n\n    private final JobService jobService;\n\n    /**\n     * Receive job status update from FastAPI\n     * Called when agent transitions or progress updates\n     */\n    @PostMapping(\"/jobs/{jobId}/status\")\n    public ResponseEntity<Map<String, Object>> updateJobStatus(\n        @PathVariable UUID jobId,\n        @RequestBody JobStatusWebhook webhook\n    ) {\n        try {\n            log.info(\"Received job status update: jobId={}, status={}, progress={}\",\n                jobId, webhook.status, webhook.progress);\n\n            jobService.updateJobStatus(\n                jobId,\n                webhook.status,\n                webhook.progress,\n                webhook.error\n            );\n\n            Map<String, Object> response = new HashMap<>();\n            response.put(\"success\", true);\n            response.put(\"message\", \"Status updated\");\n            return ResponseEntity.ok(response);\n\n        } catch (Exception e) {\n            log.error(\"Error processing job status webhook: {}\", e.getMessage(), e);\n            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)\n                .body(Map.of(\"error\", e.getMessage()));\n        }\n    }\n\n    /**\n     * Receive job completion webhook from FastAPI\n     * Called when synthesis completes and report is ready\n     */\n    @PostMapping(\"/jobs/{jobId}/complete\")\n    public ResponseEntity<Map<String, Object>> completeJob(\n        @PathVariable UUID jobId,\n        @RequestBody JobCompleteWebhook webhook\n    ) {\n        try {\n            log.info(\"Received job completion: jobId={}, reportId={}\", jobId, webhook.reportId);\n\n            jobService.updateJobStatus(jobId, \"COMPLETE\", 100, null);\n\n            // TODO: Task 21 - Store report in Spring Boot\n            // reportService.createReport(jobId, webhook.reportId, webhook.content);\n            // reportService.uploadToS3(webhook.reportId, webhook.content);\n\n            Map<String, Object> response = new HashMap<>();\n            response.put(\"success\", true);\n            response.put(\"message\", \"Job completed\");\n            return ResponseEntity.ok(response);\n\n        } catch (Exception e) {\n            log.error(\"Error processing job completion webhook: {}\", e.getMessage(), e);\n            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)\n                .body(Map.of(\"error\", e.getMessage()));\n        }\n    }\n\n    /**\n     * Receive job failure webhook from FastAPI\n     */\n    @PostMapping(\"/jobs/{jobId}/failed\")\n    public ResponseEntity<Map<String, Object>> failJob(\n        @PathVariable UUID jobId,\n        @RequestBody JobFailureWebhook webhook\n    ) {\n        try {\n            log.warn(\"Received job failure: jobId={}, error={}\", jobId, webhook.error);\n\n            jobService.updateJobStatus(jobId, \"FAILED\", 0, webhook.error);\n\n            Map<String, Object> response = new HashMap<>();\n            response.put(\"success\", true);\n            response.put(\"message\", \"Failure recorded\");\n            return ResponseEntity.ok(response);\n\n        } catch (Exception e) {\n            log.error(\"Error processing job failure webhook: {}\", e.getMessage(), e);\n            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)\n                .body(Map.of(\"error\", e.getMessage()));\n        }\n    }\n\n    /**\n     * Health check endpoint for webhooks\n     */\n    @GetMapping(\"/health\")\n    public ResponseEntity<Map<String, String>> health() {\n        return ResponseEntity.ok(Map.of(\"status\", \"webhook-receiver-healthy\"));\n    }\n\n    // ==================== Webhook DTOs ====================\n\n    /**\n     * Job status update webhook payload\n     */\n    public static class JobStatusWebhook {\n        public UUID jobId;\n        public String status; // PENDING|RUNNING|COMPLETE|FAILED\n        public Integer progress; // 0-100\n        public String error;\n        public Long timestamp;\n\n        public JobStatusWebhook() {}\n    }\n\n    /**\n     * Job completion webhook payload\n     */\n    public static class JobCompleteWebhook {\n        public UUID jobId;\n        public UUID reportId;\n        public String content; // Markdown report\n        public String storageUrl; // S3 URL if stored\n        public Long timestamp;\n\n        public JobCompleteWebhook() {}\n    }\n\n    /**\n     * Job failure webhook payload\n     */\n    public static class JobFailureWebhook {\n        public UUID jobId;\n        public String error;\n        public Integer progress;\n        public Long timestamp;\n\n        public JobFailureWebhook() {}\n    }\n}\n
+@RestController
+@RequestMapping("/api/webhooks")
+@RequiredArgsConstructor
+@Slf4j
+public class FastAPIWebhookController {
+
+    private final ResearchJobService jobService;
+
+    @PostMapping("/jobs/{jobId}/status")
+    public ResponseEntity<Map<String, Object>> updateJobStatus(
+        @PathVariable UUID jobId,
+        @RequestBody JobStatusWebhook webhook
+    ) {
+        try {
+            log.info(
+                "Received job status update: jobId={}, status={}, progress={}",
+                jobId,
+                webhook.status,
+                webhook.progress
+            );
+
+            jobService.updateJobStatus(jobId, webhook.status, webhook.error);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Status updated");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error processing job status webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/jobs/{jobId}/complete")
+    public ResponseEntity<Map<String, Object>> completeJob(
+        @PathVariable UUID jobId,
+        @RequestBody JobCompleteWebhook webhook
+    ) {
+        try {
+            log.info("Received job completion: jobId={}, reportId={}", jobId, webhook.reportId);
+
+            jobService.updateJobStatus(jobId, "COMPLETE", null);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Job completed");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error processing job completion webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/jobs/{jobId}/failed")
+    public ResponseEntity<Map<String, Object>> failJob(
+        @PathVariable UUID jobId,
+        @RequestBody JobFailureWebhook webhook
+    ) {
+        try {
+            log.warn("Received job failure: jobId={}, error={}", jobId, webhook.error);
+
+            jobService.updateJobStatus(jobId, "FAILED", webhook.error);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Failure recorded");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error processing job failure webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "webhook-receiver-healthy"));
+    }
+
+    public static class JobStatusWebhook {
+        public UUID jobId;
+        public String status;
+        public Integer progress;
+        public String error;
+        public Long timestamp;
+
+        public JobStatusWebhook() {
+        }
+    }
+
+    public static class JobCompleteWebhook {
+        public UUID jobId;
+        public UUID reportId;
+        public String content;
+        public String storageUrl;
+        public Long timestamp;
+
+        public JobCompleteWebhook() {
+        }
+    }
+
+    public static class JobFailureWebhook {
+        public UUID jobId;
+        public String error;
+        public Integer progress;
+        public Long timestamp;
+
+        public JobFailureWebhook() {
+        }
+    }
+}

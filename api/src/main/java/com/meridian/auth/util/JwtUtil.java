@@ -132,11 +132,11 @@ public class JwtUtil {
         initializeKeys();
         
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(publicKeyObj)
+            return Jwts.parser()
+                    .verifyWith(publicKeyObj)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (Exception e) {
             log.debug("Invalid JWT token: {}", e.getMessage());
             return null;

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -30,11 +31,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
         HttpServletResponse response,
         FilterChain filterChain
     ) throws ServletException, IOException {
+        HttpServletRequest requestToUse = request;
+        if (request.getRequestURI().contains("/graphql")) {
+            requestToUse = new CachedBodyHttpServletRequest(request);
+        }
+
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
         // Skip rate limiting for unauthenticated requests (they can hit auth endpoints)
-        if (auth == null || !auth.isAuthenticated()) {
-            filterChain.doFilter(request, response);
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            filterChain.doFilter(requestToUse, response);
             return;
         }
 
@@ -43,7 +49,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String method = request.getMethod();
 
         // Check if this is a job creation request
-        if (isJobCreationRequest(request, path)) {
+        if (isJobCreationRequest(requestToUse, path)) {
             RateLimitService.RateLimitResult result = rateLimitService.checkJobLimit(userId);
             if (!result.allowed) {
                 response.setStatus(429); // Too Many Requests
@@ -64,7 +70,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
         }
 
-        filterChain.doFilter(request, response);
+        filterChain.doFilter(requestToUse, response);
     }
 
     private boolean isJobCreationRequest(HttpServletRequest request, String path) {
@@ -80,7 +86,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String getRequestBody(HttpServletRequest request) {
         try {
-            return request.getReader().readLine();
+            return request.getReader().lines().reduce("", (a, b) -> a + b);
         } catch (IOException e) {
             return null;
         }

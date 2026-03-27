@@ -49,36 +49,36 @@ public class Report {
     @Column(nullable = false, length = 500)
     private String title;
 
-    @Column(nullable = false, length = 1024)
+    @Column(name = "s3_key", nullable = false, length = 1024)
     private String s3Key;
 
-    @Column
+    @Column(name = "word_count")
     private Integer wordCount;
 
-    @Column(nullable = false)
+    @Column(name = "citation_count", nullable = false)
     @Builder.Default
     private Integer citationCount = 0;
 
-    @Column(precision = 3, scale = 1)
+    @Column(name = "critic_score", precision = 3, scale = 1)
     private BigDecimal criticScore;
 
-    @Column(nullable = false)
+    @Column(name = "revision_count", nullable = false)
     @Builder.Default
     private Integer revisionCount = 0;
 
-    @Column(nullable = false)
+    @Column(name = "is_public", nullable = false)
     @Builder.Default
     private Boolean isPublic = false;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
     public boolean isSoftDeleted() {

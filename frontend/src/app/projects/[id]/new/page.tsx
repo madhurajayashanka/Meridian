@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiClient } from "@/hooks/useApiClient";
-import Navigation from "@/components/Navigation";
+import { Navigation } from "@/components/Navigation";
 import Link from "next/link";
 
 interface Document {
@@ -18,7 +18,7 @@ export default function ResearchFormPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
-  const { isAuthenticated, userId } = useAuth();
+  const { isAuthenticated } = useAuth();
   const apiClient = useApiClient();
 
   const [query, setQuery] = useState("");
@@ -26,7 +26,6 @@ export default function ResearchFormPage() {
   const [researchDepth, setResearchDepth] = useState("STANDARD");
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +40,6 @@ export default function ResearchFormPage() {
   useEffect(() => {
     const loadDocuments = async () => {
       if (!projectId) return;
-
-      setLoading(true);
       setError(null);
 
       try {
@@ -70,8 +67,6 @@ export default function ResearchFormPage() {
       } catch (err) {
         console.error("Failed to load documents:", err);
         // Non-fatal error, allow form submission without documents
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -89,7 +84,7 @@ export default function ResearchFormPage() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 

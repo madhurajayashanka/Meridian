@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiClient } from "@/hooks/useApiClient";
-import Navigation from "@/components/Navigation";
+import { Navigation } from "@/components/Navigation";
 import Link from "next/link";
 
 interface Project {
@@ -76,7 +76,7 @@ export default function DashboardPage() {
     loadProjects();
   }, [isAuthenticated, apiClient]);
 
-  const handleCreateProject = async (e: React.FormEvent) => {
+  const handleCreateProject = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 

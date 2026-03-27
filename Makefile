@@ -130,7 +130,7 @@ status:
 
 health:
 	@echo "$(BLUE)Checking service health...$(NC)"
-	@curl -sf http://localhost:3000 >/dev/null && echo "$(GREEN)✓ Frontend is reachable$(NC)" || echo "$(YELLOW)  Frontend not ready yet$(NC)"
+	@curl -sf http://localhost:3000/login >/dev/null && echo "$(GREEN)✓ Frontend is reachable$(NC)" || echo "$(YELLOW)  Frontend not ready yet$(NC)"
 	@curl -sf http://localhost:8000/actuator/health >/dev/null && echo "$(GREEN)✓ API is healthy$(NC)" || echo "$(YELLOW)  API not ready yet$(NC)"
 	@curl -sf http://localhost:8080/health >/dev/null && echo "$(GREEN)✓ AI service is healthy$(NC)" || echo "$(YELLOW)  AI service not ready yet$(NC)"
 
