@@ -1,26 +1,20 @@
-FROM eclipse-temurin:21-jdk-alpine
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Copy gradle wrapper and build files
-COPY gradlew .
-COPY gradlew.bat .
-COPY gradle gradle/
-COPY build.gradle .
-COPY settings.gradle .
-
-# Copy source code
+# Copy Maven build file and source
+COPY pom.xml .
 COPY src src/
 
 # Build application
-RUN chmod +x gradlew && ./gradlew build -x test --no-daemon
+RUN mvn -B -DskipTests package
 
 # Runtime image
 FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
 
 # Copy JAR from builder
-COPY --from=0 /app/build/libs/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \

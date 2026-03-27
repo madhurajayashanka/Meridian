@@ -1,234 +1,250 @@
-# Meridian — Autonomous Multi-Agent Research Platform
+# Meridian - Setup, Run, Test, Deploy
 
-An open-source, LLM-provider agnostic research platform that orchestrates five specialised AI agents to produce comprehensive, cited research reports from a single user query. All agent activity streams in real time via Server-Sent Events.
+Meridian is a 3-service research platform:
 
-## Quick Start
+- Frontend (Next.js) on port 3000
+- API (Spring Boot GraphQL) on port 8000
+- AI Service (FastAPI) on port 8080
+- Supporting services: PostgreSQL + Redis
 
-### Prerequisites
+This guide is written as a practical, step-by-step runbook.
 
-- Docker and Docker Compose
+## 1) What You Need
+
+### Minimum (for local run)
+
+- Docker Desktop
+- Docker Compose
 - Make
-- Node.js 18+ (for frontend development)
-- Java 21 (for API service development)
-- Python 3.11+ (for AI service development)
+- OpenSSL
+- Python 3.11+
 
-### Setup
+### Optional (for local development and tests outside Docker)
 
-1. **Clone and navigate to the project:**
+- Node.js 18+
+- Java 21+
 
-   ```bash
-   cd meridian
-   ```
+## 2) First-Time Setup (Local)
 
-2. **Generate JWT keys:**
-
-   ```bash
-   make dev-keys
-   ```
-
-3. **Configure environment:**
-
-   ```bash
-   make dev-setup
-   ```
-
-   Edit `.env` with your API keys (Tavily, OpenAI/Bedrock)
-
-4. **Start all services:**
-
-   ```bash
-   make up
-   ```
-
-5. **Access the platform:**
-   - Frontend: http://localhost:3000
-   - GraphQL API: http://localhost:8000/graphql
-   - AI Service Health: http://localhost:8080/health
-
-### Useful Commands
+From the project root:
 
 ```bash
-make logs         # View logs from all services
-make logs-api     # View API service logs
-make logs-ai      # View AI service logs
-make clean        # Reset all containers and volumes
-make test         # Run all tests
+make dev-setup
 ```
 
-## Architecture
+What this does:
 
-### Three-Service Microservices Architecture
+1. Validates prerequisites for Docker run
+2. Creates `.env` from `.env.example` if missing
+3. Generates a fresh JWT RSA keypair
+4. Injects keys into `.env` automatically
 
-```
-┌─────────────┐
-│  Frontend   │ (Next.js + TypeScript)
-│ Port: 3000  │
-└──────┬──────┘
-       │ GraphQL
-       │ SSE
-       ▼
-┌──────────────────┐        ┌─────────────────┐
-│  Spring Boot API │────────│  FastAPI AI     │
-│   Port: 8000     │ REST   │   Port: 8080    │
-│  (GraphQL, JWT)  │        │  (LangGraph)    │
-└────────┬─────────┘        └────────┬────────┘
-         │                          │
-         │                    ┌─────┴──────────┐
-         │                    │                │
-         └────────┬───────────┴─────┬──────────┘
-                  │                 │
-                  ▼                 ▼
-            ┌──────────┐      ┌──────────┐
-            │PostgreSQL│      │  Redis   │
-            │  pgvector│      │ Streams  │
-            └──────────┘      └──────────┘
-```
+Notes:
 
-### Services
+- Default LLM provider is `mock`, so API keys are not required for first run.
+- You can later edit `.env` for OpenAI/Bedrock/Tavily settings.
 
-**Frontend** — Next.js SPA
-
-- User registration, login, MFA (future)
-- Project and document management
-- Research job submission
-- Live agent activity streaming
-- Report viewing with Markdown rendering
-- Chat-with-report RAG interface
-
-**API Service** — Spring Boot GraphQL
-
-- User & project CRUD, ownership enforcement
-- Authentication & JWT token management
-- Research job submission and cancellation
-- Rate limiting (Redis-backed)
-- Report metadata and chat history persistence
-- Flyway database migrations
-- Content policy validation
-
-**AI Service** — FastAPI + LangGraph
-
-- Five-agent orchestration (Planner → Research → Analysis → Critic → Synthesizer)
-- Web search via Tavily API
-- Semantic search over documents via pgvector
-- LLM-provider abstraction (AWS Bedrock, OpenAI, Mock for dev)
-- Server-Sent Events streaming of agent state
-- Redis checkpointing for fault tolerance
-- Document extraction (PDF, TXT)
-- Report generation and S3 storage
-
-## Project Structure
-
-```
-meridian/
-├── frontend/              # Next.js 14, TypeScript, Tailwind
-├── api/                   # Spring Boot 3, Java 21
-├── ai-service/            # FastAPI, Python 3.11, LangGraph
-├── infra/                 # Terraform modules (VPC, EKS, RDS, etc.)
-├── helm/                  # Kubernetes Helm charts
-├── docker-compose.yml     # Local development environment
-├── .env.example           # Environment configuration template
-├── Makefile               # Development automation
-└── README.md              # This file
-```
-
-## LLM Providers
-
-Meridian works with:
-
-- **AWS Bedrock** (Claude 3.5 Sonnet) — Production recommended
-- **OpenAI GPT-4o** — Alternative, requires API key
-- **Mock provider** — For development, no API keys needed
-
-Switch via environment variable:
-
-```bash
-LLM_PROVIDER=bedrock    # AWS Bedrock
-LLM_PROVIDER=openai     # OpenAI
-LLM_PROVIDER=mock       # Mock (default for dev)
-```
-
-## Deployment
-
-### Kubernetes on AWS EKS
-
-1. **Build Terraform infrastructure:**
-
-   ```bash
-   cd infra
-   terraform init
-   terraform plan
-   terraform apply
-   ```
-
-2. **Deploy via Helm:**
-   ```bash
-   cd ../helm
-   helm install meridian ./api -n meridian --create-namespace
-   helm install meridian-ai ./ai-service -n meridian
-   helm install meridian-frontend ./frontend -n meridian
-   ```
-
-### Docker Compose (Development)
-
-All services run in Docker with hot-reload enabled:
+## 3) Start the Platform
 
 ```bash
 make up
 ```
 
-## Testing
+Then verify services:
 
-### Unit & Property Tests
+```bash
+make health
+```
+
+Open:
+
+- Frontend: http://localhost:3000
+- GraphQL endpoint: http://localhost:8000/graphql
+- API health: http://localhost:8000/actuator/health
+- AI health: http://localhost:8080/health
+
+## 4) Daily Usage Commands
+
+```bash
+make status         # container status
+make logs           # all logs
+make logs-api       # API logs
+make logs-ai        # AI service logs
+make restart        # restart all services
+make down           # stop all services
+```
+
+## 5) Run Tests
+
+### A) Install local test dependencies (one-time)
+
+```bash
+make dev-install
+```
+
+### B) Execute tests
 
 ```bash
 make test-unit
-```
-
-Uses:
-
-- **Java**: jqwik (property-based testing)
-- **Python**: pytest + hypothesis
-- **TypeScript**: Vitest + fast-check
-
-Minimum 100 iterations per property test.
-
-### Integration Tests
-
-```bash
 make test-integration
-```
-
-Uses Testcontainers for PostgreSQL + Redis.
-
-### E2E Tests
-
-```bash
 make test-e2e
-```
-
-Uses Playwright for comprehensive browser testing.
-
-### All Tests
-
-```bash
+# or all
 make test
 ```
 
-Target: ≥80% line coverage (Java/Python), ≥70% (TypeScript)
+## 6) Recommended Learning Path (Non-Developer Friendly)
 
-## Design & Docs
+1. Run `make dev-setup`
+2. Run `make up`
+3. Run `make health`
+4. Open frontend at http://localhost:3000
+5. Trigger one research flow in UI
+6. Watch service logs with `make logs`
+7. Stop with `make down`
 
-See the comprehensive documentation at `.kiro/specs/meridian-platform/`:
+## 7) Deployment Options
 
-- `design.md` — Technical architecture and data models
-- `requirements.md` — Functional & non-functional requirements
-- `tasks.md` — 37-task implementation plan
-- `docs/Meridian_Complete_Docs.md` — Full specification
-- `docs/QUICKSTART.md` — Setup and operation guide
-- `docs/IMPLEMENTATION_STATUS.md` — Full implementation status
+## Option A: Docker Compose on Any VM (Simplest)
 
-## Licensing
+Use this when you want a practical, quick deployment.
 
-Meridian is open source under the MIT License.
+1. Provision a Linux VM (Ubuntu is fine)
+2. Install Docker + Docker Compose + Make + OpenSSL + Python 3.11+
+3. Clone repo and enter root
+4. Run:
 
-**Built with ❤️ by the Meridian team**
+```bash
+make dev-setup
+make up
+make health
+```
+
+5. Open firewall/security-group ports:
+
+- 3000 (frontend)
+- 8000 (API)
+- 8080 (AI)
+
+This is the easiest path for practice environments.
+
+## Option B: Kubernetes + Helm (Production-Style)
+
+Helm charts are in `helm/` and support:
+
+- `meridian-api`
+- `meridian-ai`
+- `meridian-frontend`
+- Umbrella chart: `helm/Chart.yaml`
+
+### Important Scope Note
+
+Current Terraform in `infra/terraform/` provisions foundational AWS resources (VPC, RDS, Redis, S3, security components), but does not currently define an EKS cluster resource in Terraform. You need an existing Kubernetes cluster (EKS or other) before Helm deploy.
+
+### Kubernetes Deployment Steps
+
+1. Ensure your cluster is ready and kubectl context is set
+2. Build and push Docker images for api, ai-service, frontend
+3. Update image repository/tags in Helm values
+4. Deploy:
+
+```bash
+cd helm
+helm dependency build
+helm upgrade --install meridian . -n meridian --create-namespace
+```
+
+5. Verify:
+
+```bash
+kubectl get pods -n meridian
+kubectl get svc -n meridian
+```
+
+## Option C: AWS Data Layer with Terraform + App Layer with Helm
+
+Use this when practicing cloud infra plus app deployment.
+
+1. Configure AWS credentials
+2. Prepare Terraform backend (S3 + DynamoDB lock)
+3. In `infra/terraform/`:
+
+```bash
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
+```
+
+4. Capture Terraform outputs (DB/cache/storage endpoints)
+5. Inject those values into Helm values or Kubernetes secrets
+6. Deploy app with Helm to your existing cluster
+
+See `infra/terraform/README.md` for infrastructure details.
+
+## 8) Troubleshooting
+
+### `make dev-setup` fails
+
+- Run `make dev-check` to see missing prerequisites.
+
+### Frontend dependency install issues
+
+- Use local cache path automatically via Makefile target.
+- Retry:
+
+```bash
+make dev-install-frontend
+```
+
+### Services not healthy right after `make up`
+
+- Wait 30-90 seconds, then rerun:
+
+```bash
+make health
+```
+
+### API or AI service keeps restarting
+
+- Inspect logs:
+
+```bash
+make logs-api
+make logs-ai
+```
+
+### Need to reset local environment
+
+```bash
+make clean
+```
+
+## 9) Project Structure
+
+```text
+meridian/
+├── frontend/          # Next.js UI
+├── api/               # Spring Boot GraphQL API
+├── ai-service/        # FastAPI + agent workflow
+├── helm/              # Kubernetes Helm charts
+├── infra/terraform/   # AWS infrastructure definitions
+├── docker-compose.yml # Local full-stack runtime
+├── .env.example       # Environment template
+└── Makefile           # Setup/run/test automation
+```
+
+## 10) Quick Command Reference
+
+```bash
+make dev-setup      # one-time setup (env + JWT)
+make up             # start all services
+make health         # readiness check
+make logs           # watch logs
+make test           # run all tests
+make down           # stop
+make clean          # full reset (containers/volumes)
+```
+
+---
+
+If you want, the next refinement can be a one-command smoke test target that creates sample data, hits health endpoints, and validates GraphQL in one pass.

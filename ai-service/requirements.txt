@@ -1,38 +1,47 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-langchain==0.1.10
-langgraph==0.0.15
-langchain-aws==0.1.2
-langchain-openai==0.0.11
-asyncpg==0.29.0
-redis==5.0.1
-boto3==1.34.10
-tavily-python==0.3.6
-pypdf==4.0.1
-python-dotenv==1.0.0
-httpx==0.25.2
-beautifulsoup4==4.12.2
-tiktoken==0.5.2
+# Core
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+pydantic==2.11.3
+pydantic-settings==2.8.1
 
-# Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-hypothesis==6.88.0
-pytest-cov==4.1.0
-moto==4.2.9
+# LangChain / LangGraph ecosystem
+langchain==1.2.10
+langgraph==1.0.9
+langchain-aws==0.2.11
+langchain-openai==1.1.10
+
+# Database / Cache
+asyncpg==0.31.0
+redis==5.2.1
+
+# AWS
+boto3==1.42.67
+
+# Search / Documents
+tavily-python==0.5.0
+pypdf==6.7.1
 
 # Utilities
-numpy==1.26.3
-requests==2.31.0
-aiofiles==23.2.1
-python-multipart==0.0.6
+python-dotenv==1.1.0
+httpx==0.28.1
+beautifulsoup4==4.13.3
+tiktoken==0.9.0
+numpy==2.2.4
+requests==2.32.3
+aiofiles==24.1.0
+python-multipart==0.0.22
 
 # Observability
-prometheus-client==0.19.0
+prometheus-client==0.21.1
+
+# Testing
+pytest==8.3.5
+pytest-asyncio==1.0.0
+hypothesis==6.130.0
+pytest-cov==6.1.0
+moto==5.1.1
 
 # Development
-black==23.12.1
-pylint==3.0.3
-mypy==1.7.1
+black==25.1.0
+pylint==3.3.4
+mypy==1.15.0
