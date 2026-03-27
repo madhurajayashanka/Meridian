@@ -20,7 +20,7 @@ const USER_NAVIGATION = [
 
 export function Navigation() {
   const pathname = usePathname();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
+  const isAuthenticated = useAuthStore((state) => !!state.accessToken);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -78,7 +78,7 @@ export function Navigation() {
                   Login
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/register"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition"
                 >
                   Sign Up
@@ -158,7 +158,7 @@ export function Navigation() {
                     Login
                   </Link>
                   <Link
-                    href="/signup"
+                    href="/register"
                     className="block px-3 py-2 text-slate-400 hover:text-white text-sm transition"
                     onClick={() => setMobileMenuOpen(false)}
                   >

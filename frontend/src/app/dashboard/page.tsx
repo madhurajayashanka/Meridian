@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiClient } from "@/hooks/useApiClient";
@@ -18,7 +18,7 @@ interface Project {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isReady, user } = useAuth();
   const apiClient = useApiClient();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -28,18 +28,25 @@ export default function DashboardPage() {
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedProjectsRef = useRef(false);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (but wait for auth to initialize)
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isReady && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isReady, isAuthenticated, router]);
 
   // Load projects
   useEffect(() => {
+    if (!isAuthenticated) {
+      hasLoadedProjectsRef.current = false;
+      return;
+    }
+
     const loadProjects = async () => {
-      if (!isAuthenticated) return;
+      if (!isReady || !isAuthenticated) return;
+      if (hasLoadedProjectsRef.current) return;
 
       setLoading(true);
       setError(null);
@@ -64,17 +71,19 @@ export default function DashboardPage() {
           setProjects(
             response.data.projects.filter((p: Project) => !p.isArchived),
           );
+          hasLoadedProjectsRef.current = true;
         }
       } catch (err) {
         console.error("Failed to load projects:", err);
         setError("Failed to load projects");
+        hasLoadedProjectsRef.current = false;
       } finally {
         setLoading(false);
       }
     };
 
     loadProjects();
-  }, [isAuthenticated, apiClient]);
+  }, [isAuthenticated, isReady]);
 
   const handleCreateProject = async (e: FormEvent) => {
     e.preventDefault();

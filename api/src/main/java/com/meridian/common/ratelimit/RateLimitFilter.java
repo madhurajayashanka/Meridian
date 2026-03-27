@@ -96,8 +96,35 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         // Don't rate limit health checks or swagger endpoints
-        return path.contains("/actuator/health") ||
+        if (path.contains("/actuator/health") ||
             path.contains("/swagger") ||
-            path.contains("/v3/api-docs");
+            path.contains("/v3/api-docs")) {
+            return true;
+        }
+
+        // Don't rate limit auth endpoints on GraphQL (register, login, refreshToken)
+        if (path.contains("/graphql")) {
+            String body = getRequestBody(request);
+            if (body != null && (
+                body.contains("register") ||
+                body.contains("login") ||
+                body.contains("refreshToken")
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private String getRequestBody(HttpServletRequest request) {
+        try {
+            if (request instanceof CachedBodyHttpServletRequest) {
+                return request.getReader().lines().reduce("", (a, b) -> a + b);
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

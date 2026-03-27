@@ -279,6 +279,7 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .expiresIn(accessTokenExpiryMinutes * 60) // Convert to seconds
                 .tokenType("Bearer")
+            .user(user)
                 .build();
     }
 

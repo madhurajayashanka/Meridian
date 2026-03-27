@@ -1,5 +1,6 @@
 package com.meridian.auth.dto;
 
+import com.meridian.auth.entity.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,4 +27,6 @@ public class AuthResponse {
     
     @JsonProperty("token_type")
     private String tokenType = "Bearer";
+
+    private User user;
 }
