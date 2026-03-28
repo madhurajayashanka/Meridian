@@ -58,7 +58,17 @@ public class FastAPIWebhookController {
         try {
             log.info("Received job completion: jobId={}, reportId={}", jobId, webhook.reportId);
 
-            jobService.updateJobStatus(jobId, "COMPLETE", null);
+            jobService.completeJobWithReport(
+                jobId,
+                webhook.reportId,
+                webhook.title,
+                webhook.content,
+                webhook.storageUrl,
+                webhook.wordCount,
+                webhook.citationCount,
+                webhook.criticScore,
+                webhook.revisionCount
+            );
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -111,8 +121,13 @@ public class FastAPIWebhookController {
     public static class JobCompleteWebhook {
         public UUID jobId;
         public UUID reportId;
+        public String title;
         public String content;
         public String storageUrl;
+        public Integer wordCount;
+        public Integer citationCount;
+        public Double criticScore;
+        public Integer revisionCount;
         public Long timestamp;
 
         public JobCompleteWebhook() {

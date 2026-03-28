@@ -1,11 +1,13 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
+import os
 from datetime import datetime
 import uuid
 import logging
+import httpx
 
 from app.config import get_settings, Settings
 from app.graph.workflow import build_research_graph, create_initial_state
@@ -36,7 +38,7 @@ app.add_middleware(
 # Global state
 settings = None
 event_publisher = None
-research_graph = None
+research_graphs = {}
 redis_client = None
 active_jobs = {}  # job_id -> state
 
@@ -44,10 +46,18 @@ active_jobs = {}  # job_id -> state
 @app.on_event("startup")
 async def startup():
     """Initialize services on startup."""
-    global settings, event_publisher, research_graph, redis_client
+    global settings, event_publisher, research_graphs, redis_client
     
     settings = get_settings()
     logger.info(f"Starting with LLM provider: {settings.llm_provider}")
+
+    if settings.aws_access_key_id:
+        os.environ["AWS_ACCESS_KEY_ID"] = settings.aws_access_key_id
+    if settings.aws_secret_access_key:
+        os.environ["AWS_SECRET_ACCESS_KEY"] = settings.aws_secret_access_key
+    if settings.aws_region:
+        os.environ["AWS_REGION"] = settings.aws_region
+        os.environ["AWS_DEFAULT_REGION"] = settings.aws_region
     
     # Initialize event publisher
     event_publisher = EventPublisher(settings.redis_url)
@@ -56,13 +66,8 @@ async def startup():
     # Initialize Redis client
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     
-    # Initialize LLM provider and graph
-    llm_provider = get_llm_provider(
-        settings.llm_provider,
-        api_key=settings.openai_api_key if settings.llm_provider == "openai" else None,
-        region=settings.aws_region
-    )
-    research_graph = build_research_graph(llm_provider)
+    research_graphs = {}
+    get_research_graph(settings.llm_provider)
     
     logger.info("AI Service initialized successfully")
 
@@ -79,6 +84,29 @@ async def shutdown():
         redis_client.close()
     
     logger.info("AI Service shutdown complete")
+
+
+def get_research_graph(provider_name: str):
+    normalized = (provider_name or settings.llm_provider).lower()
+    if normalized in research_graphs:
+        return research_graphs[normalized]
+
+    if normalized == "bedrock":
+        if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+            raise RuntimeError("AWS Bedrock credentials are not configured for the AI service")
+
+    llm_provider = get_llm_provider(
+        normalized,
+        api_key=settings.openai_api_key if normalized == "openai" else None,
+        model=settings.openai_model if normalized == "openai" else None,
+        embedding_model=(
+            settings.openai_embedding_model if normalized == "openai" else settings.bedrock_embedding_model
+        ),
+        model_id=settings.bedrock_model_id if normalized == "bedrock" else None,
+        region=settings.aws_region,
+    )
+    research_graphs[normalized] = build_research_graph(llm_provider)
+    return research_graphs[normalized]
 
 
 @app.get("/health")
@@ -146,6 +174,7 @@ async def execute_job(job_id: str, initial_state):
     """Execute the research job workflow."""
     try:
         # Invoke the LangGraph workflow
+        research_graph = get_research_graph(initial_state.get('llm_provider'))
         final_state = await research_graph.ainvoke(
             initial_state,
             {"recursion_limit": 100}
@@ -161,17 +190,69 @@ async def execute_job(job_id: str, initial_state):
         # Publish job complete event
         if final_state.get('status') == 'complete':
             report_id = str(uuid.uuid4())
+            final_report = final_state.get('final_report') or ''
             await event_publisher.publish_job_complete(job_id, report_id)
             
-            # In production, store report to S3 and update PostgreSQL
+            # Notify Spring API to update job status and create Report row
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        f"http://api:8000/api/webhooks/jobs/{job_id}/complete",
+                        json={
+                            "reportId": report_id,
+                            "title": extract_report_title(final_report, initial_state.get('query')),
+                            "content": final_report,
+                            "wordCount": len(final_report.split()) if final_report else None,
+                            "citationCount": count_citations(final_report),
+                            "criticScore": final_state.get('critic_score'),
+                            "revisionCount": final_state.get('analysis_iteration') or 0,
+                            "timestamp": int(datetime.now().timestamp() * 1000),
+                        }
+                    )
+                    resp.raise_for_status()
+                    logger.info(f"Job {job_id} callback acknowledged by API: {resp.status_code}")
+            except Exception as cb_err:
+                logger.error(f"Failed to notify API of job {job_id} completion: {cb_err}")
+            
             logger.info(f"Job {job_id} completed with report {report_id}")
         else:
             await event_publisher.publish_job_failed(job_id, final_state.get('error', 'Unknown error'))
+            # Notify Spring API of failure
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.post(
+                        f"http://api:8000/api/webhooks/jobs/{job_id}/failed",
+                        json={"error": final_state.get('error', 'Unknown error'), "timestamp": int(datetime.now().timestamp() * 1000)}
+                    )
+            except Exception as cb_err:
+                logger.error(f"Failed to notify API of job {job_id} failure: {cb_err}")
             logger.error(f"Job {job_id} failed: {final_state.get('error')}")
     
     except Exception as e:
         logger.error(f"Error executing job {job_id}: {e}")
         await event_publisher.publish_job_failed(job_id, str(e))
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    f"http://api:8000/api/webhooks/jobs/{job_id}/failed",
+                    json={"error": str(e), "timestamp": int(datetime.now().timestamp() * 1000)}
+                )
+        except Exception as cb_err:
+            logger.error(f"Failed to notify API of job {job_id} exception: {cb_err}")
+
+
+def extract_report_title(report_content: str, query: str) -> str:
+    if report_content:
+        for line in report_content.splitlines():
+            if line.startswith('# '):
+                return line[2:].strip()
+    return f"Research: {query[:490]}"
+
+
+def count_citations(report_content: str) -> int:
+    import re
+
+    return len(re.findall(r'\[\d+\]', report_content or ''))
 
 
 @app.get("/ai/stream/{job_id}")

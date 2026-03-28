@@ -7,9 +7,11 @@ import com.meridian.common.exception.UnauthorizedException;
 import com.meridian.project.repository.ProjectRepository;
 import com.meridian.report.entity.Report;
 import com.meridian.report.repository.ReportRepository;
+import com.meridian.report.service.ReportContentStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +30,7 @@ public class ReportGraphQLController {
     private final ReportRepository reportRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ProjectRepository projectRepository;
+    private final ReportContentStorageService reportContentStorageService;
 
     @QueryMapping
     public List<Report> reports(@Argument String projectId) {
@@ -75,6 +78,11 @@ public class ReportGraphQLController {
     @QueryMapping
     public String health() {
         return "ok";
+    }
+
+    @SchemaMapping(typeName = "Report", field = "content")
+    public String content(Report report) {
+        return reportContentStorageService.readReportContent(report.getS3Key()).orElse(null);
     }
 
     private UUID getCurrentUserId() {

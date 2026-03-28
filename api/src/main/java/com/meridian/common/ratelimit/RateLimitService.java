@@ -19,10 +19,10 @@ public class RateLimitService {
 
     private final RedisTemplate<String, String> redisTemplate;
 
-    private static final int GENERAL_LIMIT = 60; // requests per minute
-    private static final int JOB_LIMIT = 5; // jobs per hour
-    private static final long GENERAL_WINDOW_SECS = 60;
-    private static final long JOB_WINDOW_SECS = 3600;
+    private static final int GENERAL_LIMIT = 100; // requests per minute
+    private static final int JOB_LIMIT = 70; // jobs per hour
+    private static final long GENERAL_WINDOW_SECS = 600;
+    private static final long JOB_WINDOW_SECS = 60;
 
     /**
      * Check if a request is allowed for general endpoint

@@ -51,7 +51,7 @@ help:
 up:
 	@[ -f .env ] || { echo "$(RED)✗ .env not found. Run 'make dev-setup' first$(NC)"; exit 1; }
 	@echo "$(BLUE)Starting Meridian platform...$(NC)"
-	docker compose up -d
+	docker compose up --build -d
 	@echo "$(GREEN)Meridian is running!$(NC)"
 	@echo "API:       http://localhost:8000"
 	@echo "AI Service: http://localhost:8080"

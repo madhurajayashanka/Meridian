@@ -39,11 +39,37 @@ def build_research_graph(llm_provider: LLMProvider):
     graph.add_node("analysis", analysis)
     graph.add_node("critic", critic)
     graph.add_node("synthesizer", synthesizer)
+
+    def continue_or_end(state: ResearchState, next_node: str):
+        if state.get("status") == "failed":
+            return "END"
+        return next_node
     
     # Define edges
-    graph.add_edge("planner", "research")
-    graph.add_edge("research", "analysis")
-    graph.add_edge("analysis", "critic")
+    graph.add_conditional_edges(
+        "planner",
+        lambda state: continue_or_end(state, "research"),
+        {
+            "research": "research",
+            "END": "__end__",
+        }
+    )
+    graph.add_conditional_edges(
+        "research",
+        lambda state: continue_or_end(state, "analysis"),
+        {
+            "analysis": "analysis",
+            "END": "__end__",
+        }
+    )
+    graph.add_conditional_edges(
+        "analysis",
+        lambda state: continue_or_end(state, "critic"),
+        {
+            "critic": "critic",
+            "END": "__end__",
+        }
+    )
     
     # Conditional edge: Critic can loop back to Analysis or proceed to Synthesizer
     # Requirement 5.7: Revise if score < 7.0 and iterations < 3

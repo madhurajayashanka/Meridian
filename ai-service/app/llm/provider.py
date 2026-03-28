@@ -46,44 +46,16 @@ class MockProvider(LLMProvider):
 
     async def invoke_chat(self, prompt: str, temperature: float = 0.3) -> str:
         """Return mock response."""
-        if "sub-question" in prompt.lower() or "decompose" in prompt.lower():
-            return """[
-                "What are the main components of a multi-agent research system?",
-                "How do LangGraph state machines work?",
-                "What are best practices for agent orchestration?",
-                "How does vector search improve retrieval quality?"
-            ]"""
-        elif "research" in prompt.lower() or "search" in prompt.lower():
-            return """{
-                "sources": [
-                    {"title": "Mock Source 1", "url": "https://example.com/1", "snippet": "Related content"},
-                    {"title": "Mock Source 2", "url": "https://example.com/2", "snippet": "Additional details"}
-                ]
-            }"""
-        elif "analyze" in prompt.lower():
-            return """## Analysis
+        prompt_lower = prompt.lower()
 
-The research findings indicate several key insights:
-
-1. Multi-agent systems are effective for complex tasks[1]
-2. State persistence ensures fault tolerance[2]  
-3. Real-time streaming provides user transparency[1]
-
-### Key Takeaways
-- Distributed agents handle parallel research
-- Vector embeddings improve semantic search
-- Redis checkpointing enables recovery
-
-[1] Source: https://example.com/1
-[2] Source: https://example.com/2"""
-        elif "critic" in prompt.lower() or "evaluate" in prompt.lower():
+        if "critic" in prompt_lower or "evaluate" in prompt_lower:
             return """{
                 "score": 8.5,
                 "feedback": "Strong analysis with good citations and coverage of key points. Could expand on limitations.",
                 "strengths": ["Good structure", "Accurate citations"],
                 "improvements": ["Add more depth on edge cases"]
             }"""
-        elif "synthesis" in prompt.lower() or "report" in prompt.lower():
+        elif "synthesis" in prompt_lower or "generate the final report" in prompt_lower or "report writer" in prompt_lower:
             return """# Research Report: Multi-Agent AI Research Systems
 
 ## Executive Summary
@@ -103,6 +75,36 @@ This report synthesizes findings on autonomous multi-agent research platforms cu
 1. Smith, J. (2024). "Multi-Agent AI Systems". Tech Journal.
 2. Chen, M. (2024). "LangGraph Workflows". AI Research.
 """
+        elif "research analyst" in prompt_lower or "write a comprehensive analysis" in prompt_lower or "analysis to transform" in prompt_lower:
+            return """## Analysis
+
+The research findings indicate several key insights:
+
+1. Multi-agent systems are effective for complex tasks[1]
+2. State persistence ensures fault tolerance[2]
+3. Real-time streaming provides user transparency[1]
+
+### Key Takeaways
+- Distributed agents handle parallel research
+- Vector embeddings improve semantic search
+- Redis checkpointing enables recovery
+
+[1] Source: https://example.com/1
+[2] Source: https://example.com/2"""
+        elif "sub-question" in prompt_lower or "decompose" in prompt_lower:
+            return """[
+                "What are the main components of a multi-agent research system?",
+                "How do LangGraph state machines work?",
+                "What are best practices for agent orchestration?",
+                "How does vector search improve retrieval quality?"
+            ]"""
+        elif "research" in prompt_lower or "search" in prompt_lower:
+            return """{
+                "sources": [
+                    {"title": "Mock Source 1", "url": "https://example.com/1", "snippet": "Related content"},
+                    {"title": "Mock Source 2", "url": "https://example.com/2", "snippet": "Additional details"}
+                ]
+            }"""
         else:
             return "Mock response to: " + prompt[:100]
 
@@ -163,17 +165,28 @@ class BedrockProvider(LLMProvider):
                  model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
                  embedding_model: str = "amazon.titan-embed-text-v2:0",
                  region: str = "us-east-1"):
-        self.model_id = model_id
+        self.model_id = self._normalize_model_id(model_id)
         self.embedding_model = embedding_model
         self.region = region
         self.chat_model = None
         self.embedding_model_obj = None
 
+    @staticmethod
+    def _normalize_model_id(model_id: str) -> str:
+        """Normalize common malformed model-id prefixes from env/config."""
+        normalized = (model_id or "").strip()
+
+        # Some env values are provided as "bedrock/<model-id>".
+        if normalized.startswith("bedrock/"):
+            normalized = normalized[len("bedrock/"):]
+
+        return normalized
+
     async def get_chat_model(self, temperature: float = 0.3):
         """Get or create Bedrock chat model."""
         if self.chat_model is None:
-            from langchain_aws import BedrockChat
-            self.chat_model = BedrockChat(
+            from langchain_aws import ChatBedrock
+            self.chat_model = ChatBedrock(
                 model_id=self.model_id,
                 region_name=self.region,
                 model_kwargs={"temperature": temperature}

@@ -17,9 +17,10 @@ interface HeadingTOC {
 interface Report {
   id: string;
   title: string;
-  wordCount: number;
+  content: string | null;
+  wordCount: number | null;
   citationCount: number;
-  criticScore: number;
+  criticScore: number | null;
   revisionCount: number;
   createdAt: string;
   job: {
@@ -48,6 +49,13 @@ export default function ReportPage() {
   const [tableOfContents, setTableOfContents] = useState<HeadingTOC[]>([]);
   const [showTOC] = useState(true);
 
+  const formatNullableNumber = (value: number | null): string => {
+    if (value === null) {
+      return "N/A";
+    }
+    return value.toLocaleString();
+  };
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
@@ -75,6 +83,8 @@ export default function ReportPage() {
                 }
                 report {
                   id
+                  title
+                  content
                   wordCount
                   citationCount
                   criticScore
@@ -96,40 +106,12 @@ export default function ReportPage() {
             job: jobData,
           });
 
-          const placeholderContent = `
-## Executive Summary
+          const content =
+            reportData.content ||
+            "## Report content unavailable\n\nThis job completed, but no markdown report content was persisted for it.";
 
-This report presents comprehensive research into the query provided. The analysis was conducted using advanced AI agents working in conjunction to investigate, synthesize, and critique the findings.
-
-## Key Findings
-
-Based on the research conducted, the following key findings emerged:
-
-- Finding 1: The research methodology employed multiple information sources
-- Finding 2: Cross-verification was performed to ensure accuracy
-- Finding 3: The analysis revealed interconnected patterns across domains
-
-### Sub-finding 1.1
-
-Additional context and supporting evidence for the key findings.
-
-## Methodology
-
-The research was conducted using a multi-agent system:
-
-1. Planning Phase: Decomposed the research question into sub-questions
-2. Research Phase: Gathered relevant sources and evidence
-3. Analysis Phase: Synthesized findings into a coherent narrative
-4. Critique Phase: Evaluated the draft for quality and accuracy
-5. Synthesis Phase: Generated the final comprehensive report
-
-## Conclusions
-
-The research demonstrates that thorough investigation combined with AI-assisted analysis can produce comprehensive and reliable reports. The methodology employed ensures both breadth and depth of coverage.
-`;
-
-          setReportContent(placeholderContent);
-          setTableOfContents(extractHeadings(placeholderContent));
+          setReportContent(content);
+          setTableOfContents(extractHeadings(content));
         } else {
           setError("Report not found");
         }
@@ -361,7 +343,7 @@ The research demonstrates that thorough investigation combined with AI-assisted 
                 <div>
                   <p className="text-slate-400 text-sm">Words</p>
                   <p className="text-white font-medium">
-                    {report.wordCount.toLocaleString()}
+                    {formatNullableNumber(report.wordCount)}
                   </p>
                 </div>
                 <div>
@@ -376,17 +358,23 @@ The research demonstrates that thorough investigation combined with AI-assisted 
                     <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${
-                          report.criticScore >= 8
-                            ? "bg-green-500"
-                            : report.criticScore >= 6
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
+                          report.criticScore === null
+                            ? "bg-slate-500"
+                            : report.criticScore >= 8
+                              ? "bg-green-500"
+                              : report.criticScore >= 6
+                                ? "bg-yellow-500"
+                                : "bg-red-500"
                         }`}
-                        style={{ width: `${(report.criticScore / 10) * 100}%` }}
+                        style={{
+                          width: `${report.criticScore === null ? 0 : (report.criticScore / 10) * 100}%`,
+                        }}
                       />
                     </div>
                     <span className="text-white font-medium">
-                      {report.criticScore.toFixed(1)}/10
+                      {report.criticScore === null
+                        ? "N/A"
+                        : `${report.criticScore.toFixed(1)}/10`}
                     </span>
                   </div>
                 </div>

@@ -33,9 +33,9 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = ""
     
     # Research configuration
-    research_quick_agents: list = ["planner", "research"]
-    research_standard_agents: list = ["planner", "research", "analysis", "critic", "synthesizer"]
-    research_deep_agents: list = ["planner", "research", "analysis", "critic", "synthesizer"]
+    research_quick_agents: str = "planner,research"
+    research_standard_agents: str = "planner,research,analysis,critic,synthesizer"
+    research_deep_agents: str = "planner,research,analysis,critic,synthesizer"
     research_deep_max_critic_iterations: int = 3
     
     # Application
@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 @lru_cache()

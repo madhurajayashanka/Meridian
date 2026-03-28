@@ -13,15 +13,21 @@ import com.meridian.job.entity.ResearchJob;
 import com.meridian.job.repository.ResearchJobRepository;
 import com.meridian.project.entity.Project;
 import com.meridian.project.repository.ProjectRepository;
+import com.meridian.report.entity.Report;
+import com.meridian.report.repository.ReportRepository;
+import com.meridian.report.service.ReportContentStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +45,10 @@ public class ResearchJobService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final FastApiClient fastApiClient;
+    private final ReportRepository reportRepository;
+    private final ReportContentStorageService reportContentStorageService;
+
+    private static final Pattern CITATION_PATTERN = Pattern.compile("\\[(\\d+)]");
 
     /**
      * Create and submit a research job.
@@ -261,9 +271,119 @@ public class ResearchJobService {
     }
 
     /**
+     * Complete a job and create its associated Report row.
+     * Called by the AI service webhook when the workflow finishes.
+     */
+    public void completeJobWithReport(
+        UUID jobId,
+        UUID reportId,
+        String providedTitle,
+        String content,
+        String storageUrl,
+        Integer providedWordCount,
+        Integer providedCitationCount,
+        Double providedCriticScore,
+        Integer providedRevisionCount
+    ) {
+        ResearchJob job = jobRepository.findById(jobId)
+            .orElseThrow(() -> new ValidationException("Job not found: " + jobId));
+
+        job.setStatus("COMPLETE");
+        job.setCompletedAt(LocalDateTime.now());
+        jobRepository.save(job);
+
+        // Avoid duplicate reports (idempotent webhook)
+        if (reportRepository.findByJobId(jobId).isPresent()) {
+            log.info("Report already exists for job {}, skipping creation", jobId);
+            return;
+        }
+
+        UUID effectiveReportId = reportId != null ? reportId : UUID.randomUUID();
+        String query = job.getQuery();
+        String title = deriveTitle(providedTitle, content, query);
+        String s3Key = resolveStorageKey(effectiveReportId, storageUrl, content);
+
+        Report report = Report.builder()
+            .id(effectiveReportId)
+            .job(job)
+            .project(job.getProject())
+            .user(job.getUser())
+            .title(title)
+            .s3Key(s3Key)
+            .wordCount(resolveWordCount(providedWordCount, content))
+            .citationCount(resolveCitationCount(providedCitationCount, content))
+            .criticScore(resolveCriticScore(providedCriticScore))
+            .revisionCount(providedRevisionCount != null ? providedRevisionCount : 0)
+            .isPublic(false)
+            .build();
+
+        reportRepository.save(report);
+        log.info("Report {} created for job {}", report.getId(), jobId);
+    }
+
+    /**
      * Check health of AI service.
      */
     public boolean isAiServiceHealthy() {
         return fastApiClient.isHealthy();
+    }
+
+    private String deriveTitle(String providedTitle, String content, String query) {
+        if (providedTitle != null && !providedTitle.isBlank()) {
+            return providedTitle.trim();
+        }
+
+        if (content != null) {
+            for (String line : content.split("\\R")) {
+                if (line.startsWith("# ")) {
+                    return line.substring(2).trim();
+                }
+            }
+        }
+
+        return "Research: " + query.substring(0, Math.min(query.length(), 490));
+    }
+
+    private String resolveStorageKey(UUID reportId, String storageUrl, String content) {
+        if (storageUrl != null && !storageUrl.isBlank()) {
+            return storageUrl.trim();
+        }
+        if (content != null && !content.isBlank()) {
+            return reportContentStorageService.storeReportContent(reportId, content);
+        }
+        return "local://report/" + reportId + ".md";
+    }
+
+    private Integer resolveWordCount(Integer providedWordCount, String content) {
+        if (providedWordCount != null && providedWordCount > 0) {
+            return providedWordCount;
+        }
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        return content.trim().split("\\s+").length;
+    }
+
+    private Integer resolveCitationCount(Integer providedCitationCount, String content) {
+        if (providedCitationCount != null) {
+            return providedCitationCount;
+        }
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+
+        Matcher matcher = CITATION_PATTERN.matcher(content);
+        int count = 0;
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
+    }
+
+    private BigDecimal resolveCriticScore(Double providedCriticScore) {
+        if (providedCriticScore == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(providedCriticScore);
     }
 }

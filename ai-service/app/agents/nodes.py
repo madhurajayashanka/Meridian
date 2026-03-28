@@ -153,6 +153,15 @@ Please write a detailed, well-structured analysis with inline citations.
 Include multiple paragraphs covering different aspects of the topic."""
 
         analysis = await llm_provider.invoke_chat(prompt, temperature=0.5)
+        if not analysis or not str(analysis).strip():
+            state['status'] = 'failed'
+            state['error'] = 'Analysis agent returned empty content'
+            state['agent_logs'].append({
+                'agent': 'analysis',
+                'status': 'failed',
+                'error': state['error']
+            })
+            return state
         
         state['analysis_draft'] = analysis
         state['analysis_iteration'] += 1

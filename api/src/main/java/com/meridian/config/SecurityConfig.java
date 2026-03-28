@@ -56,6 +56,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
                 .requestMatchers("/graphql").permitAll()
                 .requestMatchers("/graphiql").permitAll()
+                // Internal service webhooks (AI service → API, Docker-internal only)
+                .requestMatchers("/api/webhooks/**").permitAll()
                 // GraphQL requires auth except introspection
                 .requestMatchers(HttpMethod.POST, "/graphql").authenticated()
                 // All other requests require auth

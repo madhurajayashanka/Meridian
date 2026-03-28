@@ -47,13 +47,4 @@ public class FeatureGateGraphQLController {
         throw notImplemented("unpublishReport");
     }
 
-    @MutationMapping
-    public Object sendChatMessage(@Argument Object input) {
-        throw notImplemented("sendChatMessage");
-    }
-
-    @MutationMapping
-    public Boolean clearChatHistory(@Argument String reportId) {
-        throw notImplemented("clearChatHistory");
-    }
 }

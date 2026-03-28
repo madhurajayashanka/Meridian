@@ -11,6 +11,19 @@ interface ChatMessage {
   createdAt: string;
 }
 
+const normalizeRole = (role: string): "user" | "assistant" => {
+  return role.toUpperCase() === "USER" ? "user" : "assistant";
+};
+
+const normalizeMessage = (message: any): ChatMessage => ({
+  id: message.id,
+  role: normalizeRole(String(message.role || "ASSISTANT")),
+  content: String(message.content || ""),
+  tokensUsed:
+    typeof message.tokensUsed === "number" ? message.tokensUsed : undefined,
+  createdAt: String(message.createdAt || new Date().toISOString()),
+});
+
 interface ChatPanelProps {
   reportId: string;
   disabled?: boolean;
@@ -21,6 +34,7 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatUnavailable, setChatUnavailable] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const client = useApiClient();
 
@@ -28,12 +42,34 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
     // Load initial messages
     const loadMessages = async () => {
       try {
-        const response = await client.get(
-          `/api/v1/reports/${reportId}/messages`,
+        const response = await client.post("/graphql", {
+          query: `
+            query GetChatMessages($reportId: ID!) {
+              chatMessages(reportId: $reportId) {
+                id
+                role
+                content
+                tokensUsed
+                createdAt
+              }
+            }
+          `,
+          variables: { reportId },
+        });
+
+        if (Array.isArray(response?.errors) && response.errors.length > 0) {
+          console.error("Failed to load messages:", response.errors);
+          setError("Unable to load chat history");
+          return;
+        }
+
+        const normalized = (response?.data?.chatMessages || []).map(
+          normalizeMessage,
         );
-        setMessages(response.data || []);
+        setMessages(normalized);
       } catch (err) {
         console.error("Failed to load messages:", err);
+        setError("Unable to load chat history");
       }
     };
 
@@ -48,7 +84,7 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() || isLoading) {
+    if (!input.trim() || isLoading || chatUnavailable) {
       return;
     }
 
@@ -68,48 +104,46 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
     setIsLoading(true);
 
     try {
-      // Stream the response
-      const response = await fetch(`/api/v1/reports/${reportId}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${client.getAccessToken()}`,
+      const response = await client.post("/graphql", {
+        query: `
+          mutation SendChatMessage($input: SendChatMessageInput!) {
+            sendChatMessage(input: $input) {
+              id
+              role
+              content
+              tokensUsed
+              createdAt
+            }
+          }
+        `,
+        variables: {
+          input: {
+            reportId,
+            content: userMessage,
+          },
         },
-        body: JSON.stringify({ message: userMessage }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to get response");
+      if (Array.isArray(response?.errors) && response.errors.length > 0) {
+        const firstMessage = String(response.errors[0]?.message || "");
+        if (firstMessage.includes("sendChatMessage is not implemented")) {
+          setChatUnavailable(true);
+          setError("Chat is not available yet for this environment.");
+        } else {
+          setError(firstMessage || "Failed to send message");
+        }
+        setMessages((prev) => prev.slice(0, -1));
+        return;
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body");
+      const assistantResponse = response?.data?.sendChatMessage;
+      if (!assistantResponse) {
+        setError("Empty response from chat service");
+        setMessages((prev) => prev.slice(0, -1));
+        return;
       }
 
-      let assistantContent = "";
-      const assistantMsgObj: ChatMessage = {
-        id: Math.random().toString(),
-        role: "assistant",
-        content: "",
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsgObj]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = new TextDecoder().decode(value);
-        assistantContent += text;
-
-        // Update the assistant message in real-time
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          { ...assistantMsgObj, content: assistantContent },
-        ]);
-      }
+      setMessages((prev) => [...prev, normalizeMessage(assistantResponse)]);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to send message";
@@ -206,12 +240,12 @@ export function ChatPanel({ reportId, disabled = false }: ChatPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question..."
-            disabled={disabled || isLoading}
+            disabled={disabled || isLoading || chatUnavailable}
             className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={disabled || isLoading || !input.trim()}
+            disabled={disabled || isLoading || chatUnavailable || !input.trim()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-medium rounded-lg transition duration-200"
           >
             {isLoading ? "..." : "Send"}

@@ -31,9 +31,9 @@ enum DocumentStatus {
 }
 
 enum ChatRole {
-  USER
-  ASSISTANT
-  SYSTEM
+  user
+  assistant
+  system
 }
 
 # =============================================================================
@@ -93,6 +93,7 @@ type ResearchJob {
 type Report {
   id: ID!
   title: String!
+  content: String
   wordCount: Int
   citationCount: Int!
   criticScore: Float
