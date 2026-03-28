@@ -22,7 +22,7 @@ export default function ResearchFormPage() {
   const apiClient = useApiClient();
 
   const [query, setQuery] = useState("");
-  const [llmProvider, setLlmProvider] = useState("BEDROCK");
+  const [llmProvider, setLlmProvider] = useState("MOCK");
   const [researchDepth, setResearchDepth] = useState("STANDARD");
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -207,11 +207,14 @@ export default function ResearchFormPage() {
                 onChange={(e) => setLlmProvider(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               >
+                <option value="MOCK">
+                  Mock (Local development, no keys required)
+                </option>
                 <option value="BEDROCK">AWS Bedrock (Claude 3.5 Sonnet)</option>
                 <option value="OPENAI">OpenAI (GPT-4o)</option>
               </select>
               <p className="text-xs text-slate-400 mt-1">
-                Choose the LLM model for research synthesis
+                Choose Mock for local development without external credentials
               </p>
             </div>
 

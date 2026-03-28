@@ -52,10 +52,11 @@ export default function LiveJobPage() {
   );
   const [completedRedirect, setCompletedRedirect] = useState(false);
 
-  const { connected: sseConnected, error: sseError } = useSSE(
-    jobId,
-    accessToken || "",
-  );
+  const {
+    events,
+    connected: sseConnected,
+    error: sseError,
+  } = useSSE(jobId, accessToken || "");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -150,55 +151,69 @@ export default function LiveJobPage() {
   }, [job?.status, jobId, router, completedRedirect]);
 
   useEffect(() => {
-    if (job?.status !== "RUNNING") return;
+    if (!events.length) {
+      return;
+    }
 
-    const timer = setInterval(() => {
+    const latestEvent = events[events.length - 1];
+    const eventData = latestEvent.data;
+    const agentName = eventData?.agent;
+
+    if (agentName && AGENTS.includes(agentName)) {
       setAgentStatuses((prev) => {
         const updated = new Map(prev);
-        const agentIndex = AGENTS.findIndex((agentName) => {
-          const status = updated.get(agentName);
-          return status?.status === "running";
+        updated.set(agentName, {
+          agent: agentName,
+          status:
+            eventData.status === "complete"
+              ? "complete"
+              : eventData.status === "failed"
+                ? "failed"
+                : "running",
+          progress:
+            typeof eventData.progress === "string"
+              ? Number(eventData.progress)
+              : typeof eventData.progress === "number"
+                ? eventData.progress
+                : undefined,
+          output: eventData.partial_output || undefined,
+          error: eventData.error || undefined,
         });
-
-        if (agentIndex === -1) {
-          const firstAgent = updated.get(AGENTS[0]);
-          if (firstAgent?.status === "idle") {
-            updated.set(AGENTS[0], {
-              ...firstAgent,
-              status: "running",
-              progress: 0,
-            });
-          }
-        } else if (agentIndex < AGENTS.length - 1) {
-          const currentAgent = updated.get(AGENTS[agentIndex]);
-          if (!currentAgent) {
-            return updated;
-          }
-          if (!currentAgent.progress) {
-            currentAgent.progress = 0;
-          }
-          currentAgent.progress += Math.random() * 30;
-
-          if (currentAgent.progress >= 100) {
-            currentAgent.status = "complete";
-            currentAgent.progress = 100;
-            currentAgent.durationMs = Math.floor(Math.random() * 5000) + 3000;
-            updated.set(AGENTS[agentIndex + 1], {
-              agent: AGENTS[agentIndex + 1],
-              status: "running",
-              progress: 0,
-            });
-          }
-
-          updated.set(AGENTS[agentIndex], currentAgent);
-        }
-
         return updated;
       });
-    }, 2000);
+    }
 
-    return () => clearInterval(timer);
-  }, [job?.status]);
+    if (latestEvent.type === "job_complete") {
+      setAgentStatuses(
+        new Map(
+          AGENTS.map((agent) => [
+            agent,
+            { agent, status: "complete", progress: 100 },
+          ]),
+        ),
+      );
+      setJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "COMPLETE",
+            }
+          : prev,
+      );
+    }
+
+    if (latestEvent.type === "job_failed") {
+      setJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "FAILED",
+              errorMessage: eventData?.error || prev.errorMessage,
+            }
+          : prev,
+      );
+    }
+  }, [events]);
 
   if (!isAuthenticated) {
     return null;

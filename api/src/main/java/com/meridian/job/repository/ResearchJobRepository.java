@@ -27,6 +27,9 @@ public interface ResearchJobRepository extends JpaRepository<ResearchJob, UUID> 
     @Query("SELECT COUNT(j) FROM ResearchJob j WHERE j.project.id = :projectId AND j.status = 'COMPLETE'")
     long countCompleteByProjectId(UUID projectId);
 
+    @Query("SELECT COUNT(j) FROM ResearchJob j WHERE j.project.id = :projectId")
+    long countByProjectId(UUID projectId);
+
     @Query("SELECT MAX(j.completedAt) FROM ResearchJob j WHERE j.project.id = :projectId AND j.status = 'COMPLETE'")
     java.time.LocalDateTime findLastCompletionByProjectId(UUID projectId);
 }

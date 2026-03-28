@@ -1,12 +1,18 @@
 package com.meridian.job.controller;
 
+import com.meridian.common.exception.UnauthorizedException;
 import com.meridian.job.entity.ResearchJob;
+import com.meridian.report.entity.Report;
+import com.meridian.report.repository.ReportRepository;
 import com.meridian.job.service.ResearchJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 
@@ -24,6 +30,12 @@ import java.util.UUID;
 public class ResearchJobGraphQLController {
 
     private final ResearchJobService jobService;
+    private final ReportRepository reportRepository;
+
+    @SchemaMapping(typeName = "ResearchJob", field = "report")
+    public Report report(ResearchJob job) {
+        return reportRepository.findByJobId(job.getId()).orElse(null);
+    }
 
     /**
      * Query all jobs for a project.
@@ -104,9 +116,17 @@ public class ResearchJobGraphQLController {
      * Get current authenticated user ID.
      */
     private UUID getCurrentUserId() {
-        String principal = SecurityContextHolder.getContext()
-            .getAuthentication()
-            .getName();
-        return UUID.fromString(principal);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            throw new UnauthorizedException("Not authenticated");
+        }
+
+        try {
+            Object principal = auth.getPrincipal();
+            String principalValue = principal instanceof UUID ? principal.toString() : auth.getName();
+            return UUID.fromString(principalValue);
+        } catch (IllegalArgumentException ex) {
+            throw new UnauthorizedException("Not authenticated", ex);
+        }
     }
 }

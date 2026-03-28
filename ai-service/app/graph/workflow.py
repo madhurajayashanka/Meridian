@@ -17,13 +17,28 @@ def build_research_graph(llm_provider: LLMProvider):
     """
     
     graph = StateGraph(ResearchState)
+
+    async def planner(state: ResearchState):
+        return await planner_node(state, llm_provider)
+
+    async def research(state: ResearchState):
+        return await research_node(state, llm_provider)
+
+    async def analysis(state: ResearchState):
+        return await analysis_node(state, llm_provider)
+
+    async def critic(state: ResearchState):
+        return await critic_node(state, llm_provider)
+
+    async def synthesizer(state: ResearchState):
+        return await synthesizer_node(state, llm_provider)
     
     # Add agent nodes
-    graph.add_node("planner", lambda state: planner_node(state, llm_provider))
-    graph.add_node("research", lambda state: research_node(state, llm_provider))
-    graph.add_node("analysis", lambda state: analysis_node(state, llm_provider))
-    graph.add_node("critic", lambda state: critic_node(state, llm_provider))
-    graph.add_node("synthesizer", lambda state: synthesizer_node(state, llm_provider))
+    graph.add_node("planner", planner)
+    graph.add_node("research", research)
+    graph.add_node("analysis", analysis)
+    graph.add_node("critic", critic)
+    graph.add_node("synthesizer", synthesizer)
     
     # Define edges
     graph.add_edge("planner", "research")

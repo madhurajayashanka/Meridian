@@ -46,6 +46,7 @@ public class FastApiClient {
      */
     public FastApiJobResponse startJob(
         String jobId,
+        String projectId,
         String userId,
         String query,
         String llmProvider,
@@ -56,8 +57,9 @@ public class FastApiClient {
             String url = UriComponentsBuilder
                 .fromHttpUrl(aiServiceUrl)
                 .path("/api/v1/jobs/start")
+                .queryParam("job_id", jobId)
                 .queryParam("query", query)
-                .queryParam("project_id", jobId)
+                .queryParam("project_id", projectId)
                 .queryParam("user_id", userId)
                 .queryParam("llm_provider", llmProvider.toLowerCase())
                 .queryParam("research_depth", researchDepth.toLowerCase())
@@ -70,8 +72,10 @@ public class FastApiClient {
 
             log.info("Starting research job {} on FastAPI: {}", jobId, url);
 
-            ResponseEntity<FastApiJobResponse> response = restTemplate.getForEntity(
+            ResponseEntity<FastApiJobResponse> response = restTemplate.exchange(
                 url,
+                HttpMethod.POST,
+                HttpEntity.EMPTY,
                 FastApiJobResponse.class
             );
 

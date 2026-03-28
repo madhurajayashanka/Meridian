@@ -8,7 +8,8 @@ import java.util.Optional;
  */
 public enum LLMProvider {
     BEDROCK("BEDROCK"),
-    OPENAI("OPENAI");
+    OPENAI("OPENAI"),
+    MOCK("MOCK");
 
     private final String value;
 

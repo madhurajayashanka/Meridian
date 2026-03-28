@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
@@ -32,7 +33,7 @@ public class AuthGraphQLController {
     @QueryMapping
     public User me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             return null;
         }
         UUID userId = UUID.fromString(auth.getName());
@@ -44,7 +45,7 @@ public class AuthGraphQLController {
         try {
             UUID userId = UUID.fromString(id);
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !auth.isAuthenticated()) {
+            if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
                 return null;
             }
             // Users can only query themselves
@@ -96,7 +97,7 @@ public class AuthGraphQLController {
     @MutationMapping
     public Boolean logout() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             return false;
         }
         UUID userId = UUID.fromString(auth.getName());
@@ -110,7 +111,7 @@ public class AuthGraphQLController {
         @Argument String newPassword
     ) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             return false;
         }
         UUID userId = UUID.fromString(auth.getName());
@@ -124,7 +125,7 @@ public class AuthGraphQLController {
         @Argument String avatarUrl
     ) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             return null;
         }
         UUID userId = UUID.fromString(auth.getName());
@@ -134,7 +135,7 @@ public class AuthGraphQLController {
     @MutationMapping
     public Boolean deleteAccount() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             return false;
         }
         UUID userId = UUID.fromString(auth.getName());

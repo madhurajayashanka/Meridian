@@ -120,6 +120,12 @@ export default function DashboardPage() {
         },
       });
 
+      if (response?.errors?.length) {
+        throw new Error(
+          response.errors[0]?.message || "Failed to create project",
+        );
+      }
+
       if (response.data?.createProject?.id) {
         const newProject: Project = {
           id: response.data.createProject.id,
@@ -129,10 +135,12 @@ export default function DashboardPage() {
           lastActivityAt: new Date().toISOString(),
           isArchived: false,
         };
-        setProjects([newProject, ...projects]);
+        setProjects((prevProjects) => [newProject, ...prevProjects]);
         setShowCreateModal(false);
         setNewProjectName("");
         setNewProjectDesc("");
+      } else {
+        throw new Error("Project was not created");
       }
     } catch (err: any) {
       console.error("Create project error:", err);

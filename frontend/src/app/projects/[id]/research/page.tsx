@@ -2,146 +2,164 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAuthStore } from "@/hooks/useAuth";
-import { gql } from "@apollo/client";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useAuth } from "@/hooks/useAuth";
+import { useApiClient } from "@/hooks/useApiClient";
 import Link from "next/link";
 
-const SUBMIT_JOB_MUTATION = gql`
-  mutation SubmitResearchJob(
-    $projectId: String!
-    $query: String!
-    $llmProvider: String
-    $researchDepth: String
-    $documentIds: [String!]
-  ) {
-    submitResearchJob(
-      projectId: $projectId
-      query: $query
-      llmProvider: $llmProvider
-      researchDepth: $researchDepth
-      documentIds: $documentIds
-    ) {
-      id
-      query
-      status
-      progress
-      createdAt
-    }
-  }
-`;
-
-const PROJECT_QUERY = gql`
-  query GetProject($id: String!) {
-    project(id: $id) {
-      id
-      name
-      documents {
-        id
-        filename
-        status
-        mimeType
-      }
-    }
-  }
-`;
-
-interface ProjectQueryData {
-  project?: {
-    id: string;
-    name: string;
-    documents?: Array<{
-      id: string;
-      filename: string;
-      status: string;
-      mimeType: string;
-    }>;
-  };
-}
-
-interface SubmitResearchJobData {
-  submitResearchJob: {
-    id: string;
-  };
+interface Document {
+  id: string;
+  originalFilename: string;
+  status: "PROCESSING" | "READY" | "FAILED";
+  chunkCount?: number;
 }
 
 export default function ResearchFormPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
+  const { isAuthenticated, isReady } = useAuth();
+  const { post } = useApiClient();
 
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const [query, setQuery] = useState("");
-  const [llmProvider, setLlmProvider] = useState("BEDROCK");
+  const [llmProvider, setLlmProvider] = useState("MOCK");
   const [researchDepth, setResearchDepth] = useState("STANDARD");
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { data: projectData } = useQuery<ProjectQueryData>(PROJECT_QUERY, {
-    variables: { id: projectId },
-    skip: !projectId,
-  });
-
-  const [submitJob] = useMutation<SubmitResearchJobData>(SUBMIT_JOB_MUTATION, {
-    onCompleted: (data) => {
-      router.push(`/jobs/${data.submitResearchJob.id}/live`);
-    },
-    onError: (err) => {
-      setError(err.message || "Failed to submit research job");
-      setIsLoading(false);
-    },
-  });
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isReady && !isAuthenticated) {
       router.push("/login?redirect=/dashboard");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isReady, router]);
+
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!projectId || !isAuthenticated) {
+        return;
+      }
+
+      setError(null);
+
+      try {
+        const response = await post("/graphql", {
+          query: `
+            query GetDocuments($projectId: ID!) {
+              documents(projectId: $projectId) {
+                id
+                originalFilename
+                status
+                chunkCount
+              }
+            }
+          `,
+          variables: { projectId },
+        });
+
+        if (response?.data?.documents) {
+          setDocuments(
+            response.data.documents.filter(
+              (doc: Document) => doc.status === "READY",
+            ),
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load documents:", err);
+      }
+    };
+
+    loadDocuments();
+  }, [projectId, isAuthenticated, post]);
 
   if (!isAuthenticated) {
     return null;
   }
 
-  const project = projectData?.project;
-  const availableDocs =
-    project?.documents?.filter((doc) => doc.status === "COMPLETE") || [];
+  const handleDocumentToggle = (docId: string) => {
+    setSelectedDocuments((prev) => {
+      if (prev.includes(docId)) {
+        return prev.filter((id) => id !== docId);
+      }
+      if (prev.length < 5) {
+        return [...prev, docId];
+      }
+      return prev;
+    });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
+    setError(null);
 
     // Validation
-    if (!query.trim() || query.length < 10 || query.length > 500) {
-      setError("Research query must be between 10 and 500 characters");
-      setIsLoading(false);
+    if (!query.trim() || query.length < 10) {
+      setError("Research query must be at least 10 characters");
       return;
     }
 
-    if (selectedDocs.length > 5) {
-      setError("Maximum 5 documents can be selected");
-      setIsLoading(false);
+    if (query.length > 500) {
+      setError("Research query must be 500 characters or fewer");
       return;
     }
+
+    if (selectedDocuments.length > 5) {
+      setError("Maximum 5 documents can be selected");
+      return;
+    }
+
+    if (!projectId) {
+      setError("Project not found");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
-      await submitJob({
+      const response = await post("/graphql", {
+        query: `
+          mutation CreateResearchJob($input: CreateResearchJobInput!) {
+            createResearchJob(input: $input) {
+              id
+              status
+              createdAt
+            }
+          }
+        `,
         variables: {
-          projectId,
-          query: query.trim(),
-          llmProvider,
-          researchDepth,
-          documentIds: selectedDocs,
+          input: {
+            projectId,
+            query: query.trim(),
+            llmProvider,
+            researchDepth,
+            documentIds: selectedDocuments,
+          },
         },
       });
-    } catch (err) {
-      // Error handled in onError callback
+
+      if (response?.data?.createResearchJob?.id) {
+        router.push(`/jobs/${response.data.createResearchJob.id}/live`);
+      } else if (response?.errors?.length) {
+        setError(
+          response.errors[0]?.message || "Failed to create research job",
+        );
+      } else {
+        setError("Failed to create research job");
+      }
+    } catch (err: any) {
+      console.error("Research submission error:", err);
+      setError(err?.message || "Failed to submit research job");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const queryLength = query.length;
   const isQueryValid = queryLength >= 10 && queryLength <= 500;
+
+  if (!isReady || !isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -156,9 +174,7 @@ export default function ResearchFormPage() {
               ← Projects
             </Link>
             <span className="text-slate-500">/</span>
-            <span className="text-white font-medium">
-              {project?.name || "Loading..."}
-            </span>
+            <span className="text-white font-medium">Research</span>
           </div>
         </div>
       </header>
@@ -197,7 +213,7 @@ export default function ResearchFormPage() {
                 placeholder="What would you like to research? E.g., 'What are the latest advances in quantum computing?'"
                 rows={5}
                 className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none"
-                disabled={isLoading}
+                disabled={submitting}
               />
               <div className="mt-2 flex justify-between items-center">
                 <p
@@ -228,16 +244,17 @@ export default function ResearchFormPage() {
                 value={llmProvider}
                 onChange={(e) => setLlmProvider(e.target.value)}
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition"
-                disabled={isLoading}
+                disabled={submitting}
               >
+                <option value="MOCK">
+                  Mock (Local development, no keys required)
+                </option>
                 <option value="BEDROCK">AWS Bedrock (Claude 3.5)</option>
                 <option value="OPENAI">OpenAI (GPT-4o)</option>
-                <option value="MOCK">Mock (Development)</option>
               </select>
               <p className="text-xs text-slate-500 mt-2">
-                {llmProvider === "MOCK"
-                  ? "Uses deterministic mock LLM for fast development"
-                  : "Uses real LLM model for production-quality results"}
+                Use Mock for local development without AWS or OpenAI
+                credentials.
               </p>
             </div>
 
@@ -281,7 +298,7 @@ export default function ResearchFormPage() {
                       value={option.value}
                       checked={researchDepth === option.value}
                       onChange={(e) => setResearchDepth(e.target.value)}
-                      disabled={isLoading}
+                      disabled={submitting}
                       className="w-4 h-4"
                     />
                     <div className="ml-3">
@@ -294,45 +311,43 @@ export default function ResearchFormPage() {
             </div>
 
             {/* Document Selection */}
-            {availableDocs.length > 0 && (
+            {documents.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-3">
                   Reference Documents (Optional, max 5)
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {availableDocs.map((doc: any) => (
+                  {documents.map((doc) => (
                     <label
                       key={doc.id}
                       className="flex items-center p-3 bg-slate-700/50 border border-slate-600 rounded-lg cursor-pointer hover:border-blue-500 transition"
                     >
                       <input
                         type="checkbox"
-                        checked={selectedDocs.includes(doc.id)}
-                        onChange={(e) => {
-                          if (e.target.checked && selectedDocs.length < 5) {
-                            setSelectedDocs([...selectedDocs, doc.id]);
-                          } else if (!e.target.checked) {
-                            setSelectedDocs(
-                              selectedDocs.filter((id) => id !== doc.id),
-                            );
-                          }
-                        }}
+                        checked={selectedDocuments.includes(doc.id)}
+                        onChange={() => handleDocumentToggle(doc.id)}
                         disabled={
-                          isLoading ||
-                          (selectedDocs.length >= 5 &&
-                            !selectedDocs.includes(doc.id))
+                          submitting ||
+                          (selectedDocuments.length >= 5 &&
+                            !selectedDocuments.includes(doc.id))
                         }
                         className="w-4 h-4"
                       />
                       <div className="ml-3 flex-1">
-                        <p className="text-white text-sm">{doc.filename}</p>
-                        <p className="text-slate-500 text-xs">{doc.mimeType}</p>
+                        <p className="text-white text-sm">
+                          {doc.originalFilename}
+                        </p>
+                        <p className="text-slate-500 text-xs">
+                          {doc.chunkCount
+                            ? `${doc.chunkCount} chunks`
+                            : "Ready"}
+                        </p>
                       </div>
                     </label>
                   ))}
                 </div>
                 <p className="text-xs text-slate-500 mt-2">
-                  {selectedDocs.length} / 5 documents selected
+                  {selectedDocuments.length} / 5 documents selected
                 </p>
               </div>
             )}
@@ -341,10 +356,10 @@ export default function ResearchFormPage() {
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
-                disabled={isLoading || !isQueryValid}
+                disabled={submitting || !isQueryValid}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-medium rounded-lg transition"
               >
-                {isLoading ? "Submitting..." : "Start Research"}
+                {submitting ? "Submitting..." : "Start Research"}
               </button>
               <Link
                 href={`/projects/${projectId}`}

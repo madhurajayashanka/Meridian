@@ -21,6 +21,7 @@ enum ResearchDepth {
 enum LLMProvider {
   BEDROCK
   OPENAI
+  MOCK
 }
 
 enum DocumentStatus {

@@ -174,6 +174,7 @@ public class ResearchJobService {
         try {
             FastApiClient.FastApiJobResponse response = fastApiClient.startJob(
                 job.getId().toString(),
+                job.getProject().getId().toString(),
                 job.getUser().getId().toString(),
                 job.getQuery(),
                 job.getLlmProvider(),

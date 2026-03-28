@@ -84,14 +84,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return body != null && body.contains("createResearchJob");
     }
 
-    private String getRequestBody(HttpServletRequest request) {
-        try {
-            return request.getReader().lines().reduce("", (a, b) -> a + b);
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();

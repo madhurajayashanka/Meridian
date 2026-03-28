@@ -94,6 +94,7 @@ async def health_check():
 
 @app.post("/api/v1/jobs/start")
 async def start_job(
+    job_id: str = Query(None),
     query: str = Query(..., min_length=10, max_length=500),
     project_id: str = Query(...),
     user_id: str = Query(...),
@@ -106,7 +107,7 @@ async def start_job(
     Requirement 4.1: Submit research query and trigger AI service
     """
     try:
-        job_id = str(uuid.uuid4())
+        job_id = job_id or str(uuid.uuid4())
         
         # Create initial state
         state = create_initial_state(
@@ -145,8 +146,7 @@ async def execute_job(job_id: str, initial_state):
     """Execute the research job workflow."""
     try:
         # Invoke the LangGraph workflow
-        final_state = await asyncio.to_thread(
-            research_graph.invoke,
+        final_state = await research_graph.ainvoke(
             initial_state,
             {"recursion_limit": 100}
         )
