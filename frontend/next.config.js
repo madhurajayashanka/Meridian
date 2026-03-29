@@ -1,4 +1,14 @@
 /** @type {import('next').NextConfig} */
+
+// Fail fast in production if required env vars are missing
+if (process.env.NODE_ENV === "production") {
+  const required = ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_AI_URL"];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(", ")}`);
+  }
+}
+
 const nextConfig = {
   reactStrictMode: true,
   pageExtensions: ["ts", "tsx"],

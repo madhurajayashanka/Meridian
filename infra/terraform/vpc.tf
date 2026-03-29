@@ -188,13 +188,14 @@ resource "aws_security_group" "eks_nodes" {
   }
 }
 
-# Security Group for Ingress
+# Security Group for Ingress (ALB/Nginx — only 80/443 open to world)
 resource "aws_security_group" "ingress" {
   name        = "${var.app_name}-ingress-sg"
-  description = "Security group for ingress"
+  description = "Security group for public ingress — HTTP/HTTPS only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -202,24 +203,28 @@ resource "aws_security_group" "ingress" {
   }
 
   ingress {
+    description = "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # App ports only reachable from within VPC (not public internet)
   ingress {
+    description = "Frontend (internal)"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
+    description = "API/AI services (internal)"
     from_port   = 8000
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   egress {

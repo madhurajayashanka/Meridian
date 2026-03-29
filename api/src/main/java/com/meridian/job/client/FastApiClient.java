@@ -34,15 +34,21 @@ public class FastApiClient {
     @Value("${ai.service.url:http://localhost:8080}")
     private String aiServiceUrl;
 
+    @Value("${internal.api.key:}")
+    private String internalApiKey;
+
     @Value("${ai.service.timeout:30000}")
     private Integer timeout;
 
-    /** Build headers that propagate the current correlation ID to the AI service. */
+    /** Build headers that propagate correlation ID and service key to the AI service. */
     private HttpHeaders correlationHeaders() {
         HttpHeaders headers = new HttpHeaders();
         String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
         if (correlationId != null) {
             headers.set(CorrelationIdFilter.CORRELATION_ID_HEADER, correlationId);
+        }
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            headers.set("X-Service-Key", internalApiKey);
         }
         return headers;
     }

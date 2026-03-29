@@ -3,14 +3,14 @@ name: Deploy to Production
 on:
   push:
     branches:
-      - main
+      - prod
     paths:
       - "infra/terraform/**"
       - "helm/**"
       - ".github/workflows/deploy.yml"
   pull_request:
     branches:
-      - main
+      - prod
     paths:
       - "infra/terraform/**"
       - "helm/**"

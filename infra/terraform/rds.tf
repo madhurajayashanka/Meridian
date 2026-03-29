@@ -31,6 +31,7 @@ resource "aws_db_instance" "main" {
   
   # Security
   publicly_accessible    = false
+  storage_encrypted      = true
   ssl_certificate_identifier = "rds-ca-2019"
   
   # Performance Insights

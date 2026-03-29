@@ -35,6 +35,9 @@ public class DocumentService {
     @Value("${ai.service.url:http://localhost:8080}")
     private String aiServiceUrl;
 
+    @Value("${internal.api.key:}")
+    private String internalApiKey;
+
     private static final long MAX_FILE_BYTES = 10L * 1024 * 1024; // 10 MB
 
     @Transactional
@@ -88,6 +91,9 @@ public class DocumentService {
                                   String filename, byte[] bytes) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            headers.set("X-Service-Key", internalApiKey);
+        }
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("document_id", documentId);

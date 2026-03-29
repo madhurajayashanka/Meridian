@@ -22,7 +22,7 @@ export function useSSE(jobId: string, accessToken: string) {
     }
 
     try {
-      const url = `${process.env.NEXT_PUBLIC_AI_URL || "http://localhost:8080"}/ai/stream/${jobId}?token=${accessToken}`;
+      const url = `${process.env.NEXT_PUBLIC_AI_URL}/ai/stream/${jobId}?token=${accessToken}`;
       const eventSource = new EventSource(url);
 
       eventSource.addEventListener("message", (event) => {

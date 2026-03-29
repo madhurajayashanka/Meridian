@@ -84,6 +84,14 @@ public class ResearchJobService {
             throw new ValidationException("Query must be between 10 and 500 characters");
         }
 
+        // Enforce max 3 concurrent running/pending jobs per user
+        long activeJobs = jobRepository.countByUserIdAndStatusIn(
+            userId, List.of("PENDING", "RUNNING")
+        );
+        if (activeJobs >= 3) {
+            throw new ValidationException("You already have 3 active research jobs. Wait for one to complete before starting another.");
+        }
+
         // Validate LLM provider
         LLMProvider provider;
         try {

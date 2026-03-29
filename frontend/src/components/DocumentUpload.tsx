@@ -2,6 +2,7 @@
 
 import { useState, useRef, type DragEvent, type ChangeEvent } from "react";
 import { useApiClient } from "@/hooks/useApiClient";
+import { useAuthStore } from "@/hooks/useAuth";
 
 interface UploadedDocument {
   id: string;
@@ -21,6 +22,7 @@ export default function DocumentUpload({
   onUploadComplete,
 }: DocumentUploadProps) {
   const apiClient = useApiClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -110,11 +112,11 @@ export default function DocumentUpload({
       formData.append("projectId", projectId);
 
       // Upload via REST API (using fetch since this is file upload)
-      const response = await fetch("/api/v1/documents/upload", {
+      const response = await fetch("/api/documents/upload", {
         method: "POST",
         body: formData,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
+          Authorization: `Bearer ${accessToken || ""}`,
         },
       });
 

@@ -11,3 +11,5 @@ enable_nat_gateway    = true
 rds_db_name           = "meridiandb"
 rds_username          = "meridian"
 rds_password          = "CHANGE_ME_use_secrets_manager"
+# Restrict EKS API to your VPN/office CIDRs — do NOT leave as 0.0.0.0/0 in prod
+eks_public_access_cidrs = ["YOUR_VPN_CIDR/32"]

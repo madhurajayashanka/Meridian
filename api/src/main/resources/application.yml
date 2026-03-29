@@ -36,7 +36,7 @@ spring:
 
   graphql:
     graphiql:
-      enabled: true
+      enabled: ${GRAPHIQL_ENABLED:false}
       path: /graphql
       title: Meridian GraphQL API
 
@@ -53,6 +53,14 @@ server:
   port: ${SERVER_PORT:8000}
   servlet:
     context-path: /
+  tomcat:
+    max-http-form-post-size: 11MB
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
 logging:
   level:
@@ -82,18 +90,26 @@ app:
     max-documents-per-job: 5
     max-upload-size-mb: 10
 
+webhook:
+  secret: ${WEBHOOK_SECRET:}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        # Only expose health publicly; metrics/prometheus on internal port only
+        include: health
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
   metrics:
     export:
       prometheus:
         enabled: true
+
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:}
 
 resilience4j:
   circuitbreaker:

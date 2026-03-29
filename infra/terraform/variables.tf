@@ -88,6 +88,12 @@ variable "redis_num_cache_nodes" {
   default     = 2
 }
 
+variable "eks_public_access_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint. Restrict to your office/VPN IPs in production."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]  # override in prod tfvars with your actual CIDRs
+}
+
 variable "eks_cluster_version" {
   description = "EKS cluster Kubernetes version"
   type        = string

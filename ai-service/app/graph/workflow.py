@@ -1,108 +1,61 @@
 from typing import Any, Dict
 from datetime import datetime
 from langgraph.graph import StateGraph
-from app.graph.state import ResearchState, AGENT_SEQUENCE, PROMPT_VERSIONS, TOKEN_BUDGETS
+from app.graph.state import ResearchState, PROMPT_VERSIONS, TOKEN_BUDGETS
 from app.agents.nodes import (
-    planner_node, research_node, analysis_node, 
+    planner_node, research_node, analysis_node,
     critic_node, synthesizer_node
 )
 from app.llm.provider import LLMProvider
 
 
+def _end(state): return "__end__"
+def _fail_or(next_node):
+    def route(state):
+        return "END" if state.get("status") == "failed" else next_node
+    return route
+
+
 def build_research_graph(llm_provider: LLMProvider):
-    """
-    Build the LangGraph research workflow.
-    Requirement 5.1: Execute agents in sequence: Planner → Research → Analysis → Critic → Synthesizer
-    Requirement 5.10: Persist state to Redis after each agent transition
-    """
-    
+    """Build LangGraph workflow. Depth-aware: quick skips analysis/critic loop."""
+
     graph = StateGraph(ResearchState)
 
-    async def planner(state: ResearchState):
-        return await planner_node(state, llm_provider)
+    graph.add_node("planner",     lambda s: planner_node(s, llm_provider))
+    graph.add_node("research",    lambda s: research_node(s, llm_provider))
+    graph.add_node("analysis",    lambda s: analysis_node(s, llm_provider))
+    graph.add_node("critic",      lambda s: critic_node(s, llm_provider))
+    graph.add_node("synthesizer", lambda s: synthesizer_node(s, llm_provider))
 
-    async def research(state: ResearchState):
-        return await research_node(state, llm_provider)
+    # planner → research (all depths)
+    graph.add_conditional_edges("planner", _fail_or("research"),
+                                {"research": "research", "END": "__end__"})
 
-    async def analysis(state: ResearchState):
-        return await analysis_node(state, llm_provider)
-
-    async def critic(state: ResearchState):
-        return await critic_node(state, llm_provider)
-
-    async def synthesizer(state: ResearchState):
-        return await synthesizer_node(state, llm_provider)
-    
-    # Add agent nodes
-    graph.add_node("planner", planner)
-    graph.add_node("research", research)
-    graph.add_node("analysis", analysis)
-    graph.add_node("critic", critic)
-    graph.add_node("synthesizer", synthesizer)
-
-    def continue_or_end(state: ResearchState, next_node: str):
+    # research → synthesizer (quick) or analysis (standard/deep)
+    def after_research(state):
         if state.get("status") == "failed":
             return "END"
-        return next_node
-    
-    # Define edges
-    graph.add_conditional_edges(
-        "planner",
-        lambda state: continue_or_end(state, "research"),
-        {
-            "research": "research",
-            "END": "__end__",
-        }
-    )
-    graph.add_conditional_edges(
-        "research",
-        lambda state: continue_or_end(state, "analysis"),
-        {
-            "analysis": "analysis",
-            "END": "__end__",
-        }
-    )
-    graph.add_conditional_edges(
-        "analysis",
-        lambda state: continue_or_end(state, "critic"),
-        {
-            "critic": "critic",
-            "END": "__end__",
-        }
-    )
-    
-    # Conditional edge: Critic can loop back to Analysis or proceed to Synthesizer
-    # Requirement 5.7: Revise if score < 7.0 and iterations < 3
-    def critic_route(state: ResearchState):
-        if state['status'] == 'failed':
-            return  "END"
-        
-        if (state.get('critic_score', 0) < 7.0 and 
-            state.get('critic_iterations', 0) < 3):
-            # Revise analysis
+        return "synthesizer" if state.get("research_depth") == "quick" else "analysis"
+
+    graph.add_conditional_edges("research", after_research,
+                                {"analysis": "analysis", "synthesizer": "synthesizer", "END": "__end__"})
+
+    graph.add_conditional_edges("analysis", _fail_or("critic"),
+                                {"critic": "critic", "END": "__end__"})
+
+    def critic_route(state):
+        if state.get("status") == "failed":
+            return "END"
+        if state.get("critic_score", 0) < 7.0 and state.get("critic_iterations", 0) < 3:
             return "analysis"
-        else:
-            # Proceed to synthesis
-            return "synthesizer"
-    
-    graph.add_conditional_edges(
-        "critic",
-        critic_route,
-        {
-            "analysis": "analysis",
-            "synthesizer": "synthesizer",
-            "END": "__end__"
-        }
-    )
-    
+        return "synthesizer"
+
+    graph.add_conditional_edges("critic", critic_route,
+                                {"analysis": "analysis", "synthesizer": "synthesizer", "END": "__end__"})
+
     graph.add_edge("synthesizer", "__end__")
-    
-    # Set entry point
     graph.set_entry_point("planner")
-    
-    # Compile and return
-    compiled_graph = graph.compile()
-    return compiled_graph
+    return graph.compile()
 
 
 def create_initial_state(
@@ -111,9 +64,8 @@ def create_initial_state(
     query: str,
     llm_provider: str,
     research_depth: str,
-    uploaded_doc_ids: list = None
+    uploaded_doc_ids: list = None,
 ) -> ResearchState:
-    """Create initial ResearchState for a new job."""
     return ResearchState(
         job_id=job_id,
         user_id=user_id,
@@ -121,15 +73,11 @@ def create_initial_state(
         llm_provider=llm_provider,
         research_depth=research_depth,
         uploaded_doc_ids=uploaded_doc_ids or [],
-
-        # Prompt versioning metadata
         prompt_versions=dict(PROMPT_VERSIONS),
-        model_id=None,  # resolved at runtime by provider
+        model_id=None,
         retrieval_config_version="1.0.0",
         citation_policy_version="1.0.0",
         guardrail_policy_version="1.0.0",
-
-        # Agent outputs (empty initially)
         sub_questions=[],
         report_structure=None,
         research_results={},
@@ -139,18 +87,12 @@ def create_initial_state(
         critic_feedback=None,
         critic_iterations=0,
         final_report=None,
-        
-        # Token budget
         tokens_used=0,
         token_budget=TOKEN_BUDGETS.get(research_depth, TOKEN_BUDGETS["standard"]),
-
-        # Citations and logging
         citations=[],
         agent_logs=[],
-        
-        # Status
         status="running",
         error=None,
         started_at=datetime.now().isoformat(),
-        completed_at=None
+        completed_at=None,
     )

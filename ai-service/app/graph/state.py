@@ -69,7 +69,9 @@ TOKEN_BUDGETS = {
     "standard": 60_000,
     "deep": 120_000,
 }
-    "quick": ["planner", "research"],
+
+AGENT_SEQUENCE = {
+    "quick": ["planner", "research", "synthesizer"],  # skip analysis/critic loop for speed
     "standard": ["planner", "research", "analysis", "critic", "synthesizer"],
-    "deep": ["planner", "research", "analysis", "critic", "synthesizer"]
+    "deep": ["planner", "research", "analysis", "critic", "synthesizer"],
 }

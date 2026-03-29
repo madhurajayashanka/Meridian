@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     """Application settings from environment variables."""
     
     # Database
-    database_url: str = "postgresql+asyncpg://meridian:meridian_dev_password@localhost:5432/meridian"
-    
+    database_url: str = "postgresql+asyncpg://meridian:meridian@localhost:5432/meridian"
+
     # Redis
     redis_url: str = "redis://localhost:6379"
     
@@ -40,9 +40,15 @@ class Settings(BaseSettings):
     research_deep_agents: str = "planner,research,analysis,critic,synthesizer"
     research_deep_max_critic_iterations: int = 3
     
+    # Internal service-to-service auth
+    internal_api_key: str = ""  # set INTERNAL_API_KEY env; Spring sends this header
+
+    # CORS
+    cors_allowed_origins: str = "http://localhost:3000"  # comma-separated list
+
     # JWT validation
     jwt_public_key: str = ""
-    webhook_secret: str = ""  # HMAC-SHA256 secret shared with Spring API
+    webhook_secret: str = ""
     log_level: str = "INFO"
     debug: bool = False
     e2e_with_llm: bool = False

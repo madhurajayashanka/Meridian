@@ -1,5 +1,6 @@
 .PHONY: help up down logs logs-api logs-ai logs-postgres logs-redis restart clean test build health \
-	dev-setup dev-keys dev-check dev-install dev-install-frontend dev-install-ai
+	dev-setup dev-keys dev-check dev-install dev-install-frontend dev-install-ai \
+	aws-destroy aws-destroy-env aws-plan aws-apply
 
 # Colors for output
 BLUE   := \033[0;34m
@@ -189,5 +190,43 @@ dev-setup: dev-check
 	@echo "  Edit .env to configure OPENAI_API_KEY or AWS credentials"
 	@echo ""
 	@echo "Run: $(BLUE)make up$(NC)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AWS Infrastructure — Terraform helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+TF_ENV ?= prod
+TF_DIR  = infra/terraform/environments/$(TF_ENV)
+
+aws-plan: ## Preview Terraform changes for TF_ENV (default: prod)
+	@echo "$(BLUE)Terraform plan — environment: $(TF_ENV)$(NC)"
+	cd $(TF_DIR) && terraform init -input=false && terraform plan -var-file=terraform.tfvars
+
+aws-apply: ## Apply Terraform for TF_ENV (default: prod)
+	@echo "$(BLUE)Terraform apply — environment: $(TF_ENV)$(NC)"
+	cd $(TF_DIR) && terraform init -input=false && terraform apply -var-file=terraform.tfvars
+
+aws-destroy: ## ⚠️  DESTROY ALL AWS resources for TF_ENV (default: prod). Irreversible.
+	@echo "$(RED)╔══════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(RED)║  WARNING: This will DESTROY all AWS resources for:      ║$(NC)"
+	@echo "$(RED)║  environment = $(TF_ENV)$(NC)"
+	@echo "$(RED)║  This action is IRREVERSIBLE and will delete:            ║$(NC)"
+	@echo "$(RED)║    • EKS cluster + node groups                           ║$(NC)"
+	@echo "$(RED)║    • RDS PostgreSQL instance + final snapshot            ║$(NC)"
+	@echo "$(RED)║    • ElastiCache Redis cluster                           ║$(NC)"
+	@echo "$(RED)║    • S3 buckets (documents + reports)                    ║$(NC)"
+	@echo "$(RED)║    • VPC, subnets, security groups, NAT gateways         ║$(NC)"
+	@echo "$(RED)║    • IAM roles, Secrets Manager secrets                  ║$(NC)"
+	@echo "$(RED)╚══════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@read -p "Type the environment name to confirm ($(TF_ENV)): " confirm && \
+		[ "$$confirm" = "$(TF_ENV)" ] || (echo "$(RED)Aborted.$(NC)" && exit 1)
+	@echo "$(YELLOW)Destroying AWS resources for $(TF_ENV)...$(NC)"
+	cd $(TF_DIR) && terraform init -input=false && \
+		terraform destroy -var-file=terraform.tfvars -auto-approve
+	@echo "$(GREEN)✓ All AWS resources for $(TF_ENV) destroyed.$(NC)"
+
+aws-destroy-env: ## Destroy a specific env: make aws-destroy-env TF_ENV=staging
+	@$(MAKE) aws-destroy TF_ENV=$(TF_ENV)
 
 .DEFAULT_GOAL := help

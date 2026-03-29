@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form, Header, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -23,8 +23,12 @@ from app.metrics import (
 )
 import redis
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure structured logging — respects LOG_LEVEL env
+_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, _log_level, logging.INFO),
+    format='{"time":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}',
+)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
@@ -37,10 +41,10 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allowed_origins.split(",") if settings else ["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Correlation-ID"],
 )
 app.middleware("http")(http_metrics_middleware)
 app.add_route("/metrics", metrics_endpoint)
@@ -50,7 +54,8 @@ settings = None
 event_publisher = None
 research_graphs = {}
 redis_client = None
-active_jobs = {}  # job_id -> state
+active_jobs = {}
+db_pool = None  # shared asyncpg pool
 
 
 CORRELATION_ID_HEADER = "X-Correlation-ID"
@@ -81,8 +86,8 @@ def get_correlation_id() -> str:
 
 async def startup():
     """Initialize services on startup."""
-    global settings, event_publisher, research_graphs, redis_client
-    
+    global settings, event_publisher, research_graphs, redis_client, db_pool
+
     settings = get_settings()
     logger.info(f"Starting with LLM provider: {settings.llm_provider}")
 
@@ -93,30 +98,36 @@ async def startup():
     if settings.aws_region:
         os.environ["AWS_REGION"] = settings.aws_region
         os.environ["AWS_DEFAULT_REGION"] = settings.aws_region
-    
-    # Initialize event publisher
+
     event_publisher = EventPublisher(settings.redis_url)
     await event_publisher.initialize()
-    
-    # Initialize Redis client
+
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-    
+
+    # Shared DB pool — reused across all requests
+    import asyncpg
+    _db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+    db_pool = await asyncpg.create_pool(_db_url, min_size=2, max_size=10)
+
     research_graphs = {}
     get_research_graph(settings.llm_provider)
-    
+
     logger.info("AI Service initialized successfully")
 
 
 @app.on_event("shutdown")
 async def shutdown():
     """Cleanup on shutdown."""
-    global event_publisher, redis_client
-    
+    global event_publisher, redis_client, db_pool
+
     if event_publisher:
         await event_publisher.close()
-    
+
     if redis_client:
         redis_client.close()
+
+    if db_pool:
+        await db_pool.close()
     
     logger.info("AI Service shutdown complete")
 
@@ -177,18 +188,61 @@ def validate_jwt_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
 
+def _require_service_key(x_service_key: str = Header(default="")) -> None:
+    """Validate internal service-to-service API key. Skip check in dev when key not configured."""
+    key = settings.internal_api_key if settings else ""
+    if key and x_service_key != key:
+        raise HTTPException(status_code=401, detail="Invalid service key")
 
+
+def _signed_headers(payload: dict) -> dict:
+    """Return headers with HMAC-SHA256 signature for AI→API callbacks."""
+    body = json.dumps(payload).encode()
+    secret = settings.webhook_secret if settings else ""
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        headers["X-Webhook-Signature"] = sig
+    return headers
+
+
+@app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check — verifies DB pool and Redis are reachable."""
+    checks = {"db": "ok", "redis": "ok"}
+    status = "healthy"
+
+    try:
+        if db_pool:
+            async with db_pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+        else:
+            checks["db"] = "not_initialized"
+            status = "degraded"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+        status = "degraded"
+
+    try:
+        if redis_client:
+            redis_client.ping()
+        else:
+            checks["redis"] = "not_initialized"
+            status = "degraded"
+    except Exception as e:
+        checks["redis"] = f"error: {e}"
+        status = "degraded"
+
     return {
-        "status": "healthy",
+        "status": status,
         "service": "meridian-ai",
-        "llm_provider": settings.llm_provider,
-        "timestamp": datetime.now().isoformat()
+        "llm_provider": settings.llm_provider if settings else "unknown",
+        "checks": checks,
+        "timestamp": datetime.now().isoformat(),
     }
 
 
-@app.post("/api/v1/jobs/start")
+@app.post("/api/v1/jobs/start", dependencies=[Depends(_require_service_key)])
 async def start_job(
     job_id: str = Query(None),
     query: str = Query(..., min_length=10, max_length=500),
@@ -267,18 +321,20 @@ async def execute_job(job_id: str, initial_state):
             # Notify Spring API to update job status and create Report row
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
+                    payload = {
+                        "reportId": report_id,
+                        "title": extract_report_title(final_report, initial_state.get('query')),
+                        "content": final_report,
+                        "wordCount": len(final_report.split()) if final_report else None,
+                        "citationCount": count_citations(final_report),
+                        "criticScore": final_state.get('critic_score'),
+                        "revisionCount": final_state.get('analysis_iteration') or 0,
+                        "timestamp": int(datetime.now().timestamp() * 1000),
+                    }
                     resp = await client.post(
                         f"http://api:8000/api/webhooks/jobs/{job_id}/complete",
-                        json={
-                            "reportId": report_id,
-                            "title": extract_report_title(final_report, initial_state.get('query')),
-                            "content": final_report,
-                            "wordCount": len(final_report.split()) if final_report else None,
-                            "citationCount": count_citations(final_report),
-                            "criticScore": final_state.get('critic_score'),
-                            "revisionCount": final_state.get('analysis_iteration') or 0,
-                            "timestamp": int(datetime.now().timestamp() * 1000),
-                        }
+                        json=payload,
+                        headers=_signed_headers(payload),
                     )
                     resp.raise_for_status()
                     logger.info(f"Job {job_id} callback acknowledged by API: {resp.status_code}")
@@ -292,9 +348,11 @@ async def execute_job(job_id: str, initial_state):
             # Notify Spring API of failure
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
+                    fail_payload = {"error": final_state.get('error', 'Unknown error'), "timestamp": int(datetime.now().timestamp() * 1000)}
                     await client.post(
                         f"http://api:8000/api/webhooks/jobs/{job_id}/failed",
-                        json={"error": final_state.get('error', 'Unknown error'), "timestamp": int(datetime.now().timestamp() * 1000)}
+                        json=fail_payload,
+                        headers=_signed_headers(fail_payload),
                     )
             except Exception as cb_err:
                 logger.error(f"Failed to notify API of job {job_id} failure: {cb_err}")
@@ -306,9 +364,11 @@ async def execute_job(job_id: str, initial_state):
         await event_publisher.publish_job_failed(job_id, str(e))
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
+                exc_payload = {"error": str(e), "timestamp": int(datetime.now().timestamp() * 1000)}
                 await client.post(
                     f"http://api:8000/api/webhooks/jobs/{job_id}/failed",
-                    json={"error": str(e), "timestamp": int(datetime.now().timestamp() * 1000)}
+                    json=exc_payload,
+                    headers=_signed_headers(exc_payload),
                 )
         except Exception as cb_err:
             logger.error(f"Failed to notify API of job {job_id} exception: {cb_err}")
@@ -414,7 +474,7 @@ async def get_job_status(job_id: str):
     }
 
 
-@app.post("/api/v1/documents/process")
+@app.post("/api/v1/documents/process", dependencies=[Depends(_require_service_key)])
 async def process_document(
     document_id: str = Form(...),
     file_type: str = Form(...),
@@ -427,29 +487,23 @@ async def process_document(
     from app.rag.extractor import DocumentExtractor, TextChunker
     from app.rag.store import EmbeddingStore
 
+    tmp_path = None
     try:
-        # Write upload to a temp file
         suffix = f".{file_type.lower()}"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(await file.read())
             tmp_path = tmp.name
 
-        # Extract text
         text = DocumentExtractor.extract_text(tmp_path, file_type)
-        os.unlink(tmp_path)
 
         if not text:
             raise HTTPException(status_code=422, detail="Could not extract text from document")
 
-        # Chunk
         chunks = TextChunker.chunk_text(text)
         if not chunks:
             raise HTTPException(status_code=422, detail="Document produced no chunks")
 
-        # Embed and store
         provider_name = settings.llm_provider
-        llm_provider = get_research_graph(provider_name)  # reuse cached provider
-        # Actually get the provider directly
         from app.llm.provider import get_llm_provider as _get_provider
         provider = _get_provider(
             provider_name,
@@ -458,9 +512,13 @@ async def process_document(
             region=settings.aws_region,
         )
 
-        db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-        store = EmbeddingStore(db_url)
-        await store.initialize()
+        if db_pool is None:
+            raise HTTPException(status_code=503, detail="Database not ready")
+
+        # Use global pool directly — no per-request pool creation
+        store = EmbeddingStore.__new__(EmbeddingStore)
+        store.db_url = None
+        store.pool = db_pool
 
         for idx, chunk in enumerate(chunks):
             embedding = await provider.embed_text(chunk)
@@ -471,8 +529,6 @@ async def process_document(
                 metadata={"chunk_index": idx, "document_id": document_id},
             )
 
-        await store.close()
-
         logger.info(f"Processed document {document_id}: {len(chunks)} chunks embedded")
         return {"document_id": document_id, "chunk_count": len(chunks), "status": "ready"}
 
@@ -481,6 +537,9 @@ async def process_document(
     except Exception as e:
         logger.error(f"Error processing document {document_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @app.post("/api/v1/chat/{report_id}")
@@ -497,12 +556,18 @@ async def chat_with_report(
     """
     validate_jwt_token(token)
 
+    # Guardrail: check chat message for injection
+    from app.guardrails import check_input, GuardrailViolation
+    try:
+        check_input(message)
+    except GuardrailViolation as e:
+        raise HTTPException(status_code=400, detail=f"Message blocked: {e.reason}")
+
     from app.api.chat import RAGChatService
-    import asyncpg
 
     try:
-        db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-        pool = await asyncpg.create_pool(db_url, min_size=1, max_size=3)
+        if db_pool is None:
+            raise HTTPException(status_code=503, detail="Database not ready")
 
         provider_name = settings.llm_provider
         from app.llm.provider import get_llm_provider as _get_provider
@@ -514,9 +579,8 @@ async def chat_with_report(
             region=settings.aws_region,
         )
 
-        chat_service = RAGChatService(pool, provider)
+        chat_service = RAGChatService(db_pool, provider)
 
-        # Collect full response for sync callers (Spring Boot GraphQL proxy)
         full_response = ""
         async for chunk in chat_service.stream_chat_response(
             report_id=report_id,
@@ -525,7 +589,6 @@ async def chat_with_report(
         ):
             full_response += chunk
 
-        await pool.close()
         return {"response": full_response, "report_id": report_id}
 
     except HTTPException:
