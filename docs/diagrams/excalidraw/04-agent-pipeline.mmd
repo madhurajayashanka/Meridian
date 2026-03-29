@@ -1,0 +1,30 @@
+%% Meridian Diagram 04: LangGraph Agent Pipeline
+flowchart TB
+    classDef state fill:#FFF6D8,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef agent fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef decision fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    S[ResearchState\njob_id, query, depth, provider\nsub_questions, research_results\nanalysis_draft, critic_score\nfinal_report, tokens_used, budget]:::state
+
+    START([Entry]) --> S
+    S --> PL[Planner\nfast model\ninput guardrail]:::agent
+    PL --> RE[Research\nTavily + pgvector]:::agent
+
+    RE --> D1{depth == quick?}:::decision
+    D1 -->|Yes| SY[Synthesizer\nfull model\noutput guardrail]:::agent
+    D1 -->|No| AN[Analysis\nfull model]:::agent
+
+    AN --> CR[Critic\nfast model\nscore + feedback]:::agent
+    CR --> D2{score < 7\nand iter < 3?}:::decision
+    D2 -->|Yes| AN
+    D2 -->|No| SY
+
+    SY --> TK{token budget\nremaining?}:::decision
+    TK -->|No| FAIL([FAILED])
+    TK -->|Yes| DONE([COMPLETE])
+
+    PL -. checkpoint .-> CP[(Redis checkpoint 48h)]
+    RE -. events .-> EV[(Redis stream 24h)]
+    AN -. events .-> EV
+    CR -. events .-> EV
+    SY -. events .-> EV

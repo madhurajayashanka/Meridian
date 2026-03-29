@@ -1,0 +1,53 @@
+%% Meridian Diagram 08: Frontend Pages, Components, Hooks
+flowchart LR
+    classDef route fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef comp fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef hook fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    subgraph ROUTES[Route Map]
+      r0[/]
+      r1[/login]
+      r2[/register]
+      r3[/dashboard]
+      r4[/projects/{id}]
+      r5[/projects/{id}/new]
+      r6[/jobs/{id}/live]
+      r7[/jobs/{id}/report]
+      r8[/settings]
+      r9[/docs]
+      r10[/faq]
+      r11[/pricing]
+    end
+
+    subgraph COMPONENTS[Key Components]
+      c1[Navigation]
+      c2[DocumentUpload]
+      c3[AgentCard x5]
+      c4[ChatPanel]
+      c5[ErrorBoundary]
+      c6[Markdown Renderer + TOC]
+    end
+
+    subgraph HOOKS[Hook Dependencies]
+      h1[useAuth\nZustand + localStorage]
+      h2[useApiClient\nauto refresh + retry 401]
+      h3[useSSE\nEventSource + backoff]
+    end
+
+    r3 --> c1
+    r4 --> c2
+    r6 --> c3
+    r7 --> c4
+    r7 --> c6
+    r0 --> c5
+
+    c1 --> h1
+    c2 --> h1
+    c2 --> h2
+    c3 --> h3
+    c4 --> h2
+    r6 -->|on job_complete| r7
+
+    class r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11 route;
+    class c1,c2,c3,c4,c5,c6 comp;
+    class h1,h2,h3 hook;

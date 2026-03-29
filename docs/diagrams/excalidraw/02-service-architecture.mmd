@@ -1,0 +1,41 @@
+%% Meridian Diagram 02: Service Architecture
+flowchart TB
+    classDef edge fill:#F7F0FF,stroke:#6B4EA0,color:#241737,stroke-width:1px;
+    classDef spring fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef fastapi fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef data fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+
+    Browser[Browser]
+
+    subgraph S[Spring Boot API :8000]
+        SF1[Filters\nCorrelationId\nRateLimit\nJWT]
+        SC1[Controllers\nGraphQL + REST]
+        SS1[Services\nAuth/Project/Job/Report/Chat]
+        SR1[Repositories\nSpring Data JPA]
+        SF1 --> SC1 --> SS1 --> SR1
+    end
+
+    subgraph A[FastAPI AI Service :8080]
+        FM[Middleware\nMetrics + Correlation ID]
+        FD[Dependencies\nService Key + JWT]
+        FR[Routes\n/jobs/start\n/docs/process\n/stream/{id}\n/chat/{id}]
+        FC[Core Modules\nLangGraph + Agents + LLM + RAG]
+        FM --> FD --> FR --> FC
+    end
+
+    PG[(PostgreSQL :5432)]
+    RD[(Redis :6379)]
+
+    Browser -->|GraphQL/REST| S
+    Browser -->|SSE| A
+    S -->|Internal REST + Webhook| A
+
+    SR1 --> PG
+    FC --> PG
+    S --> RD
+    A --> RD
+
+    class Browser edge;
+    class SF1,SC1,SS1,SR1 spring;
+    class FM,FD,FR,FC fastapi;
+    class PG,RD data;

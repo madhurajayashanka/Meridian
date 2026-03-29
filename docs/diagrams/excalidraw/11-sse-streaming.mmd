@@ -1,0 +1,32 @@
+%% Meridian Diagram 11: SSE Streaming Lifecycle
+sequenceDiagram
+    autonumber
+    participant Br as Browser
+    participant AI as FastAPI SSE Endpoint
+    participant R as Redis Stream
+    participant LG as LangGraph Worker
+
+    Br->>AI: GET /ai/stream/{job_id}?token=jwt
+    AI->>AI: Validate JWT and open stream
+    AI-->>Br: text/event-stream (open connection)
+
+    loop Agent execution
+      LG->>R: XADD job:{id}:events agent_update
+      AI->>R: XREAD BLOCK 1000ms
+      R-->>AI: event messages
+      AI-->>Br: event: agent_update + data JSON
+    end
+
+    alt Job complete
+      LG->>R: XADD type=job_complete, report_id
+      AI->>R: XREAD next event
+      R-->>AI: job_complete event
+      AI-->>Br: event: job_complete
+      Br->>Br: Navigate to /jobs/{id}/report
+    else Job failed
+      LG->>R: XADD type=job_failed, error
+      AI-->>Br: event: job_failed
+    end
+
+    Note over AI,R: Stream key: job:{job_id}:events, TTL 24h
+    Note over Br,AI: Frontend reconnects with exponential backoff (max 5)

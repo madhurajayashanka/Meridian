@@ -1,0 +1,89 @@
+%% Meridian Diagram 05: Database ERD (Core Relationships)
+erDiagram
+    users ||--o{ projects : owns
+    users ||--o{ refresh_tokens : has
+    users ||--o{ api_keys : has
+    users ||--o{ audit_logs : triggers
+    users ||--o{ research_jobs : runs
+    users ||--o{ documents : uploads
+    users ||--o{ reports : owns
+    users ||--o{ chat_messages : writes
+
+    projects ||--o{ documents : contains
+    projects ||--o{ research_jobs : contains
+    projects ||--o{ reports : contains
+
+    research_jobs ||--|| reports : produces
+    research_jobs ||--o{ agent_logs : records
+    research_jobs ||--o{ research_job_documents : links
+
+    documents ||--o{ embeddings : chunked_into
+    documents ||--o{ research_job_documents : selected_for
+
+    reports ||--o{ embeddings : embedded_into
+    reports ||--o{ chat_messages : has
+
+    users {
+        uuid id PK
+        string email
+        string password_hash
+        int failed_logins
+        datetime locked_until
+        bool is_active
+        datetime deleted_at
+    }
+    projects {
+        uuid id PK
+        uuid user_id FK
+        string name
+        string description
+        bool is_archived
+        datetime deleted_at
+    }
+    documents {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        string original_filename
+        string s3_key
+        string file_type
+        int file_size
+        string status
+        int chunk_count
+        datetime deleted_at
+    }
+    research_jobs {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        string query
+        string status
+        string llm_provider
+        string research_depth
+        datetime started_at
+        datetime completed_at
+        string error_message
+    }
+    reports {
+        uuid id PK
+        uuid job_id FK
+        uuid project_id FK
+        uuid user_id FK
+        string title
+        string s3_key
+        int word_count
+        int citation_count
+        float critic_score
+        int revision_count
+        bool is_public
+        datetime deleted_at
+    }
+    embeddings {
+        uuid id PK
+        uuid document_id FK
+        uuid report_id FK
+        string content
+        string embedding_vector_1536
+        int chunk_index
+        json metadata
+    }

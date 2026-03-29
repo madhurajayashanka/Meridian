@@ -1,0 +1,48 @@
+%% Meridian Diagram 13: AWS Infrastructure Topology
+flowchart TB
+    classDef internet fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef aws fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef data fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+    classDef ext fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    Internet[Internet Users]:::internet
+
+    subgraph AWS[AWS us-east-1]
+      subgraph VPC[VPC 10.0.0.0/16]
+        subgraph PUB[Public Subnets 10.0.101-103.0/24]
+          IGW[Internet Gateway]
+          NAT[NAT Gateway]
+        end
+        subgraph PRV[Private Subnets 10.0.1-3.0/24]
+          EKS[EKS Cluster + Node Group\n2-10 nodes]
+          PODS[Pods\nfrontend + api + ai]
+          RDS[(RDS PostgreSQL\nMulti-AZ encrypted)]:::data
+          REDIS[(ElastiCache Redis\nMulti-AZ encrypted)]:::data
+        end
+      end
+
+      S3D[(S3 meridian-documents)]:::data
+      S3R[(S3 meridian-reports)]:::data
+      S3T[(S3 terraform-state)]:::data
+    end
+
+    BED[AWS Bedrock]:::ext
+    TAV[Tavily API]:::ext
+    GHCR[GHCR Images]:::ext
+
+    Internet --> IGW
+    IGW --> EKS
+    EKS --> PODS
+    PODS --> RDS
+    PODS --> REDIS
+    PODS --> NAT
+    NAT --> BED
+    NAT --> TAV
+    NAT --> GHCR
+
+    PODS --> S3D
+    PODS --> S3R
+    EKS --> S3T
+
+    IRSA[IRSA Role for meridian-ai\nBedrock + S3 permissions only]:::aws
+    PODS --> IRSA

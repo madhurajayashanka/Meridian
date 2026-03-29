@@ -1,0 +1,33 @@
+%% Meridian Diagram 07: REST APIs (Spring + FastAPI)
+flowchart TB
+    classDef spring fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef ai fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef note fill:#FFF6D8,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+
+    subgraph SPRING[Spring Boot :8000]
+      s1[POST /api/documents/upload\nBearer JWT + multipart\nPDF/TXT <= 10MB]
+      s2[POST /api/webhooks/jobs/{id}/complete\nX-Webhook-Signature HMAC]
+      s3[POST /api/webhooks/jobs/{id}/failed\nInternal callback]
+      s4[GET /actuator/health]
+    end
+
+    subgraph FASTAPI[FastAPI :8080]
+      f1[GET /health]
+      f2[GET /metrics]
+      f3[POST /api/v1/jobs/start\nX-Service-Key]
+      f4[GET /api/v1/jobs/{job_id}\nX-Service-Key]
+      f5[POST /api/v1/documents/process\nX-Service-Key + multipart]
+      f6[GET /ai/stream/{job_id}?token=jwt\nSSE]
+      f7[POST /api/v1/chat/{report_id}\nuser_id + message + token]
+    end
+
+    Client[Browser / Internal callers]
+    Client --> SPRING
+    Client --> FASTAPI
+
+    n1[Response patterns\n200 success\n401 auth/signature issues\n422 validation issues\n503 dependency issues]:::note
+    SPRING --> n1
+    FASTAPI --> n1
+
+    class s1,s2,s3,s4 spring;
+    class f1,f2,f3,f4,f5,f6,f7 ai;

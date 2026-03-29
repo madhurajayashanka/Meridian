@@ -1,0 +1,47 @@
+%% Meridian Diagram 06: GraphQL API Surface
+flowchart LR
+    classDef root fill:#FFF6D8,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef query fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef mutation fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef auth fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    Q[Query Root]:::root
+    M[Mutation Root]:::root
+
+    Q --> q1[me]
+    Q --> q2[user(id)]
+    Q --> q3[projects]
+    Q --> q4[project(id)]
+    Q --> q5[jobs(projectId?)]
+    Q --> q6[job(id)]
+    Q --> q7[documents(projectId)]
+    Q --> q8[reports(projectId?)]
+    Q --> q9[report(id)]
+    Q --> q10[publicReports]
+    Q --> q11[chatMessages(reportId)]
+
+    M --> a1[register]
+    M --> a2[login]
+    M --> a3[refreshToken]
+    M --> a4[logout]
+    M --> p1[createProject]
+    M --> p2[updateProject]
+    M --> p3[deleteProject]
+    M --> j1[createResearchJob]
+    M --> j2[cancelResearchJob]
+    M --> d1[deleteDocument]
+    M --> r1[exportReport]
+    M --> r2[publish or unpublish]
+    M --> c1[sendChatMessage]
+    M --> c2[clearChatHistory]
+
+    A1[AuthPayload\naccessToken 15m\nrefreshToken 7d\nuser + expiresIn]:::auth
+    I1[CreateResearchJobInput\nprojectId, query\nllmProvider, depth\ndocumentIds <= 5]:::auth
+
+    a1 --> A1
+    a2 --> A1
+    a3 --> A1
+    j1 --> I1
+
+    class q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11 query;
+    class a1,a2,a3,a4,p1,p2,p3,j1,j2,d1,r1,r2,c1,c2 mutation;

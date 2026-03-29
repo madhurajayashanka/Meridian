@@ -1,0 +1,32 @@
+%% Meridian Diagram 10: Document Processing and RAG
+flowchart TB
+    classDef user fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef spring fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef fast fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef data fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+
+    U[User Uploads PDF/TXT]:::user
+    S[Spring Boot Upload Endpoint]:::spring
+    F[FastAPI /documents/process]:::fast
+    E[Extractor + Chunker\n512 tokens/chunk\n50 overlap]:::fast
+    EM[Embedding Model\nvector 1536]:::fast
+    DB[(PostgreSQL embeddings)]:::data
+
+    U --> S
+    S -->|validate ownership, type, size <= 10MB| S
+    S -->|create document PROCESSING| DB
+    S -->|multipart + X-Service-Key| F
+    F --> E
+    E -->|chunks| EM
+    EM -->|insert vectors| DB
+    F -->|chunk_count + ready| S
+    S -->|document READY| U
+
+    subgraph RAG[RAG Retrieval during Research/Chat]
+      Q[Question]:::user --> V[embed question]:::fast
+      V --> KNN[pgvector similarity search\nORDER BY embedding <=> query LIMIT top-k]:::fast
+      KNN --> Ctx[Context chunks + scores]:::fast
+      Ctx --> LLM[LLM answer synthesis]:::fast
+    end
+
+    DB --> KNN

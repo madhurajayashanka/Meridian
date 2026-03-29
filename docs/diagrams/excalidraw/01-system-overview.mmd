@@ -1,0 +1,39 @@
+%% Meridian Diagram 01: System Overview
+flowchart LR
+    classDef user fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef app fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef data fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+    classDef ext fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    U[User Browser]
+
+    subgraph MP[Meridian Platform]
+        FE[Next.js Frontend\n:3000]
+        API[Spring Boot API\n:8000]
+        AI[FastAPI AI Service\n:8080]
+        PG[(PostgreSQL + pgvector\n:5432)]
+        RD[(Redis\n:6379)]
+    end
+
+    T[Tavily]
+    B[AWS Bedrock]
+    O[OpenAI]
+
+    U -->|HTTPS GraphQL/REST| FE
+    FE -->|GraphQL + REST| API
+    FE -->|SSE Stream| AI
+    API -->|Internal REST| AI
+
+    API -->|JPA| PG
+    API -->|Rate limits + JWT| RD
+    AI -->|asyncpg| PG
+    AI -->|Events + checkpoints| RD
+
+    AI -->|Web search| T
+    AI -->|LLM calls| B
+    AI -->|LLM calls| O
+
+    class U user;
+    class FE,API,AI app;
+    class PG,RD data;
+    class T,B,O ext;

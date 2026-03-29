@@ -1,0 +1,36 @@
+%% Meridian Diagram 12: Security by Layer
+flowchart TB
+    classDef layer fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef control fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+
+    BL[Browser Layer]:::layer
+    AP[Spring API Layer]:::layer
+    AI[FastAPI AI Layer]:::layer
+    DL[Data Layer]:::layer
+    IL[Infrastructure Layer]:::layer
+
+    BL --> AP --> AI --> DL --> IL
+
+    BL --> b1[CSP + HSTS + XFO + nosniff]:::control
+    BL --> b2[Permissions-Policy + Referrer-Policy]:::control
+    BL --> b3[ErrorBoundary hides internals]:::control
+
+    AP --> a1[JWT RS256 filter + CORS allowlist]:::control
+    AP --> a2[Redis rate limits + max active jobs]:::control
+    AP --> a3[Ownership checks + audit logs]:::control
+    AP --> a4[Webhook HMAC verify + idempotency]:::control
+
+    AI --> f1[X-Service-Key on internal APIs]:::control
+    AI --> f2[SSE JWT validation]:::control
+    AI --> f3[Guardrails input/output checks]:::control
+    AI --> f4[Token budget limits + retry policy]:::control
+
+    DL --> d1[Postgres/Redis private only]:::control
+    DL --> d2[Encryption at rest + in transit]:::control
+    DL --> d3[Secrets via ESO + Secrets Manager]:::control
+    DL --> d4[Soft delete support]:::control
+
+    IL --> i1[VPC segmentation public vs private]:::control
+    IL --> i2[Security groups least privilege]:::control
+    IL --> i3[IRSA scoped pod permissions]:::control
+    IL --> i4[CI scans: Gitleaks + Trivy + CodeQL]:::control

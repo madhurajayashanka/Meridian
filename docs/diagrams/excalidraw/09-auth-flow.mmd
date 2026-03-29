@@ -1,0 +1,37 @@
+%% Meridian Diagram 09: Authentication Flow
+flowchart LR
+    classDef browser fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef api fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef db fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+    classDef sec fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    B[Browser]:::browser
+    A[Spring Boot Auth API]:::api
+    D[(PostgreSQL)]:::db
+
+    B -->|register(email,password,name)| A
+    A -->|validate + bcrypt cost=12| A
+    A -->|insert user| D
+    A -->|issue access 15m + refresh 7d| B
+    A -->|store SHA256(refresh) hash| D
+
+    B -->|login(email,password)| A
+    A -->|find user + verify password| D
+    A --> L{failed attempts >= 5?}:::sec
+    L -->|Yes| LOCK[lock 15 minutes + 401]:::sec
+    L -->|No| TOKENS[issue new token pair]:::sec
+    TOKENS --> B
+
+    B -->|refreshToken(refreshToken)| A
+    A -->|validate JWT type=refresh| A
+    A -->|lookup hashed token + revoke old| D
+    A -->|return fresh token pair| B
+
+    S2S[Service-to-Service Auth]\n
+    K1[X-Service-Key\nSpring -> FastAPI]:::sec
+    K2[X-Webhook-Signature HMAC\nFastAPI -> Spring]:::sec
+    K3[SSE token query param\nBrowser -> FastAPI]:::sec
+
+    S2S --> K1
+    S2S --> K2
+    S2S --> K3

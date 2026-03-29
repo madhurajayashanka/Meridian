@@ -1,0 +1,53 @@
+%% Meridian Diagram 03: Research Job End-to-End Flow
+flowchart LR
+    classDef user fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef api fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef ai fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef data fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+    classDef state fill:#FFE6DE,stroke:#B5522D,color:#462014,stroke-width:1px;
+
+    U[Browser User]
+    API[Spring Boot API]
+    AI[FastAPI AI Service]
+    R[(Redis Events + Checkpoints)]
+    DB[(PostgreSQL)]
+
+    U -->|createResearchJob mutation| API
+    API -->|validate ownership + active jobs <= 3| API
+    API -->|create job PENDING| DB
+    API -->|POST /jobs/start| AI
+    AI -->|checkpoint write| R
+    API -->|update RUNNING| DB
+
+    U -->|GET /ai/stream/{id}?token=jwt| AI
+    AI -->|XREAD stream loop| R
+    AI -->|SSE agent_update| U
+
+    AI --> P[Planner]
+    P --> RS[Research]
+    RS --> Q{Depth = quick?}
+    Q -->|Yes| SY[Synthesizer]
+    Q -->|No| AN[Analysis]
+    AN --> CR[Critic]
+    CR --> L{score < 7 and\niterations < 3?}
+    L -->|Yes| AN
+    L -->|No| SY
+    SY -->|emit job_complete| R
+
+    AI -->|Webhook complete| API
+    API -->|create report + mark COMPLETE| DB
+    AI -->|SSE job_complete| U
+    U -->|open /jobs/{id}/report| API
+
+    P:::ai
+    RS:::ai
+    AN:::ai
+    CR:::ai
+    SY:::ai
+    U:::user
+    API:::api
+    AI:::ai
+    R:::data
+    DB:::data
+    Q:::state
+    L:::state

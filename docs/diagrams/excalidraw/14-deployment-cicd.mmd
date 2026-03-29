@@ -1,0 +1,31 @@
+%% Meridian Diagram 14: CI/CD and Deployment Pipeline
+flowchart TB
+    classDef source fill:#F9F7D9,stroke:#B58B00,color:#2F2F2F,stroke-width:1px;
+    classDef ci fill:#DCEBFF,stroke:#2C5AA0,color:#1E2A3A,stroke-width:1px;
+    classDef deploy fill:#E8F6FF,stroke:#0F6FA5,color:#173347,stroke-width:1px;
+    classDef result fill:#E2F7E2,stroke:#2E7D32,color:#1F3A1F,stroke-width:1px;
+
+    G[Git push or PR]:::source --> CI[CI Workflow]:::ci
+
+    CI --> C1[Backend checks\nLint + tests + coverage + build]
+    CI --> C2[AI checks\nLint + format + tests + coverage]
+    CI --> C3[Frontend checks\nESLint + TS + tests + build]
+    CI --> C4[Security scans\nGitleaks + Trivy + CodeQL]
+
+    C1 --> PASS{All checks pass?}
+    C2 --> PASS
+    C3 --> PASS
+    C4 --> PASS
+
+    PASS -->|No| FAIL[Pipeline fails + report issues]:::result
+    PASS -->|Yes| IMG[Build and push images\nGHCR tags: branch/sha/latest]:::ci
+
+    IMG --> DEP[Deploy Workflow]:::deploy
+    DEP --> T1[Terraform init/plan/apply]
+    DEP --> H1[Helm upgrade --install\n--atomic --wait]
+    H1 --> S1[Smoke health checks]
+    S1 --> E2E[Playwright e2e tests]
+
+    E2E --> OK{Deployment healthy?}
+    OK -->|Yes| DONE[Notify success]:::result
+    OK -->|No| RB[Helm rollback + notify failure]:::result
