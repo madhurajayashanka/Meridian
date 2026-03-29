@@ -1,0 +1,13 @@
+environment           = "production"
+aws_region            = "us-east-1"
+rds_instance_class    = "db.t4g.medium"
+rds_allocated_storage = 100
+redis_node_type       = "cache.t4g.small"
+redis_num_cache_nodes = 2
+eks_desired_size      = 3
+eks_min_size          = 2
+eks_max_size          = 10
+enable_nat_gateway    = true
+rds_db_name           = "meridiandb"
+rds_username          = "meridian"
+rds_password          = "CHANGE_ME_use_secrets_manager"

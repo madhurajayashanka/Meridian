@@ -6,11 +6,9 @@ global:
   environment: production
   domain: meridian.example.com
 
-  # Image registry
   imageRegistry: ghcr.io
   imagePullSecrets: []
 
-  # Ingress configuration
   ingress:
     enabled: true
     className: nginx
@@ -18,11 +16,18 @@ global:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       nginx.ingress.kubernetes.io/ssl-redirect: "true"
 
-  # TLS/SSL certificate
   tls:
     enabled: true
     issuer: letsencrypt-prod
     email: admin@meridian.example.com
+
+# External Secrets Operator — pulls secrets from AWS Secrets Manager into K8s secrets
+# Install ESO first: helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+externalSecrets:
+  enabled: true
+  region: us-east-1
+  # Path in AWS Secrets Manager, e.g. "meridian/production/app-secrets"
+  secretPath: "meridian/production/app-secrets"
 
 # Meridian API Service Subchart
 meridian-api:

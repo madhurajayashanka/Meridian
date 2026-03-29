@@ -13,10 +13,13 @@ fullnameOverride: ""
 serviceAccount:
   create: true
   # IRSA: annotate with the IAM role ARN created by Terraform (eks.tf ai_service_irsa_role_arn output)
-  # Set this via --set or in a values override file per environment
   annotations:
-    eks.amazonaws.com/role-arn: ""  # e.g. arn:aws:iam::123456789012:role/meridian-ai-service-irsa
+    eks.amazonaws.com/role-arn: ""
   name: "meridian-ai"
+
+externalSecrets:
+  enabled: false          # set true in prod; override via umbrella values
+  secretPath: "meridian/production/app-secrets"
 
 podAnnotations:
   prometheus.io/scrape: "true"

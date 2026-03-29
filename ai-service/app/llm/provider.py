@@ -2,9 +2,25 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 import importlib
 import asyncio
+import logging
 from types import SimpleNamespace
 
 import boto3
+from tenacity import (
+    retry, stop_after_attempt, wait_exponential,
+    retry_if_exception_type, before_sleep_log,
+)
+
+logger = logging.getLogger(__name__)
+
+# Retry decorator for all real LLM calls: 3 attempts, exponential backoff 1s→8s
+_llm_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type((Exception,)),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
 
 
 class LLMProvider(ABC):
@@ -26,8 +42,15 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def invoke_chat(self, prompt: str, temperature: float = 0.3) -> str:
-        """Invoke the chat model and return response."""
+        """Invoke the full/expensive chat model."""
         pass
+
+    async def invoke_chat_fast(self, prompt: str, temperature: float = 0.3) -> str:
+        """
+        Invoke a cheaper/faster model for simple tasks (planner, critic, research).
+        Default falls back to invoke_chat; override in subclasses for real routing.
+        """
+        return await self.invoke_chat(prompt, temperature)
 
     @abstractmethod
     async def embed_text(self, text: str) -> List[float]:
@@ -151,11 +174,15 @@ The research findings indicate several key insights:
 class OpenAIProvider(LLMProvider):
     """OpenAI GPT-4o provider."""
 
-    def __init__(self, api_key: str, model: str = "gpt-4o", embedding_model: str = "text-embedding-3-small"):
+    def __init__(self, api_key: str, model: str = "gpt-4o",
+                 model_fast: str = "gpt-4o-mini",
+                 embedding_model: str = "text-embedding-3-small"):
         self.api_key = api_key
         self.model = model
+        self.model_fast = model_fast
         self.embedding_model = embedding_model
         self.chat_model = None
+        self._fast_model = None
         self.embedding_model_obj = None
 
     async def get_chat_model(self, temperature: float = 0.3):
@@ -179,14 +206,27 @@ class OpenAIProvider(LLMProvider):
             )
         return self.embedding_model_obj
 
+    @_llm_retry
     async def invoke_chat(self, prompt: str, temperature: float = 0.3) -> str:
-        """Invoke OpenAI chat model."""
+        """Invoke OpenAI chat model with retry."""
         model = await self.get_chat_model(temperature)
         response = await model.ainvoke(prompt)
         return response.content
 
+    @_llm_retry
+    async def invoke_chat_fast(self, prompt: str, temperature: float = 0.3) -> str:
+        """Invoke cheaper OpenAI model (gpt-4o-mini) for simple tasks."""
+        if self._fast_model is None:
+            from langchain_openai import ChatOpenAI
+            self._fast_model = ChatOpenAI(
+                api_key=self.api_key, model_name=self.model_fast, temperature=temperature
+            )
+        response = await self._fast_model.ainvoke(prompt)
+        return response.content
+
+    @_llm_retry
     async def embed_text(self, text: str) -> List[float]:
-        """Embed text using OpenAI."""
+        """Embed text using OpenAI with retry."""
         embeddings = await self.get_embedding_model()
         return await embeddings.aembed_query(text)
 
@@ -194,14 +234,17 @@ class OpenAIProvider(LLMProvider):
 class BedrockProvider(LLMProvider):
     """AWS Bedrock (Claude 3.5 Sonnet) provider."""
 
-    def __init__(self, 
+    def __init__(self,
                  model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+                 model_id_fast: str = "anthropic.claude-3-haiku-20240307-v1:0",
                  embedding_model: str = "amazon.titan-embed-text-v2:0",
                  region: str = "us-east-1"):
         self.model_id = self._normalize_model_id(model_id)
+        self.model_id_fast = self._normalize_model_id(model_id_fast)
         self.embedding_model = embedding_model
         self.region = self._normalize_region(region)
         self.chat_model = None
+        self._fast_chat_model = None
         self.embedding_model_obj = None
 
     def _build_boto3_converse_adapter(self, temperature: float):
@@ -313,12 +356,32 @@ class BedrockProvider(LLMProvider):
             )
         return self.embedding_model_obj
 
+    @_llm_retry
     async def invoke_chat(self, prompt: str, temperature: float = 0.3) -> str:
-        """Invoke Bedrock chat model."""
+        """Invoke Bedrock chat model with retry + exponential backoff."""
         model = await self.get_chat_model(temperature)
         response = await model.ainvoke(prompt)
         return response.content
 
+    @_llm_retry
+    async def invoke_chat_fast(self, prompt: str, temperature: float = 0.3) -> str:
+        """Invoke Claude Haiku for cheap/fast tasks (planner, critic, research)."""
+        if self._fast_chat_model is None:
+            converse_cls = self._load_chat_bedrock_converse_class()
+            if converse_cls is not None:
+                self._fast_chat_model = converse_cls(
+                    model_id=self.model_id_fast,
+                    region_name=self.region,
+                    temperature=temperature,
+                )
+            else:
+                self._fast_chat_model = self._build_boto3_converse_adapter(temperature)
+                # swap model_id for fast model
+                self._fast_chat_model._model_id = self.model_id_fast
+        response = await self._fast_chat_model.ainvoke(prompt)
+        return response.content
+
+    @_llm_retry
     async def embed_text(self, text: str) -> List[float]:
         """Embed text using Bedrock."""
         embeddings = await self.get_embedding_model()
@@ -334,11 +397,13 @@ def get_llm_provider(provider: str, **kwargs) -> LLMProvider:
         return OpenAIProvider(
             api_key=kwargs.get("api_key"),
             model=kwargs.get("model", "gpt-4o"),
+            model_fast=kwargs.get("model_fast", "gpt-4o-mini"),
             embedding_model=kwargs.get("embedding_model", "text-embedding-3-small")
         )
     elif provider.lower() == "bedrock":
         return BedrockProvider(
             model_id=kwargs.get("model_id", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
+            model_id_fast=kwargs.get("model_id_fast", "anthropic.claude-3-haiku-20240307-v1:0"),
             embedding_model=kwargs.get("embedding_model", "amazon.titan-embed-text-v2:0"),
             region=kwargs.get("region", "us-east-1")
         )

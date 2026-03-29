@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
 import os
+import tempfile
 from datetime import datetime
 import uuid
 import logging
@@ -133,10 +134,12 @@ def get_research_graph(provider_name: str):
         normalized,
         api_key=settings.openai_api_key if normalized == "openai" else None,
         model=settings.openai_model if normalized == "openai" else None,
+        model_fast=settings.openai_model_fast if normalized == "openai" else None,
         embedding_model=(
             settings.openai_embedding_model if normalized == "openai" else settings.bedrock_embedding_model
         ),
         model_id=settings.bedrock_model_id if normalized == "bedrock" else None,
+        model_id_fast=settings.bedrock_model_id_fast if normalized == "bedrock" else None,
         region=settings.aws_region,
     )
     research_graphs[normalized] = build_research_graph(llm_provider)
@@ -409,6 +412,127 @@ async def get_job_status(job_id: str):
         "error": state.get('error'),
         "completed_at": state.get('completed_at')
     }
+
+
+@app.post("/api/v1/documents/process")
+async def process_document(
+    document_id: str = Form(...),
+    file_type: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """
+    Accept a document upload, extract text, chunk it, embed each chunk,
+    and store embeddings in pgvector. Called by Spring Boot after S3 upload.
+    """
+    from app.rag.extractor import DocumentExtractor, TextChunker
+    from app.rag.store import EmbeddingStore
+
+    try:
+        # Write upload to a temp file
+        suffix = f".{file_type.lower()}"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+
+        # Extract text
+        text = DocumentExtractor.extract_text(tmp_path, file_type)
+        os.unlink(tmp_path)
+
+        if not text:
+            raise HTTPException(status_code=422, detail="Could not extract text from document")
+
+        # Chunk
+        chunks = TextChunker.chunk_text(text)
+        if not chunks:
+            raise HTTPException(status_code=422, detail="Document produced no chunks")
+
+        # Embed and store
+        provider_name = settings.llm_provider
+        llm_provider = get_research_graph(provider_name)  # reuse cached provider
+        # Actually get the provider directly
+        from app.llm.provider import get_llm_provider as _get_provider
+        provider = _get_provider(
+            provider_name,
+            api_key=settings.openai_api_key if provider_name == "openai" else None,
+            model_id=settings.bedrock_model_id if provider_name == "bedrock" else None,
+            region=settings.aws_region,
+        )
+
+        db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        store = EmbeddingStore(db_url)
+        await store.initialize()
+
+        for idx, chunk in enumerate(chunks):
+            embedding = await provider.embed_text(chunk)
+            await store.store_embedding(
+                content=chunk,
+                embedding=embedding,
+                document_id=document_id,
+                metadata={"chunk_index": idx, "document_id": document_id},
+            )
+
+        await store.close()
+
+        logger.info(f"Processed document {document_id}: {len(chunks)} chunks embedded")
+        return {"document_id": document_id, "chunk_count": len(chunks), "status": "ready"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/chat/{report_id}")
+async def chat_with_report(
+    report_id: str,
+    token: str = Query(...),
+    user_id: str = Query(...),
+    message: str = Query(...),
+):
+    """
+    RAG chat endpoint.
+    - Streaming SSE when called from frontend directly (Accept: text/event-stream)
+    - JSON response when called from Spring Boot GraphQL proxy
+    """
+    validate_jwt_token(token)
+
+    from app.api.chat import RAGChatService
+    import asyncpg
+
+    try:
+        db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        pool = await asyncpg.create_pool(db_url, min_size=1, max_size=3)
+
+        provider_name = settings.llm_provider
+        from app.llm.provider import get_llm_provider as _get_provider
+        provider = _get_provider(
+            provider_name,
+            api_key=settings.openai_api_key if provider_name == "openai" else None,
+            model_id=settings.bedrock_model_id if provider_name == "bedrock" else None,
+            model_id_fast=settings.bedrock_model_id_fast if provider_name == "bedrock" else None,
+            region=settings.aws_region,
+        )
+
+        chat_service = RAGChatService(pool, provider)
+
+        # Collect full response for sync callers (Spring Boot GraphQL proxy)
+        full_response = ""
+        async for chunk in chat_service.stream_chat_response(
+            report_id=report_id,
+            user_message=message,
+            user_id=user_id,
+        ):
+            full_response += chunk
+
+        await pool.close()
+        return {"response": full_response, "report_id": report_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat error for report {report_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

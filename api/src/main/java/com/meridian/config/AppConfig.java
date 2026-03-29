@@ -3,19 +3,15 @@ package com.meridian.config;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 
-/**
- * Application configuration for beans and REST clients.
- */
 @Configuration
+@EnableAsync
 public class AppConfig {
 
-    /**
-     * Configure RestTemplate with timeouts for FastAPI communication.
-     */
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         return builder

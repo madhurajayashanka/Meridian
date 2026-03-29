@@ -57,10 +57,10 @@ Example format: ["What is X?", "How does Y work?", "Why is Z important?"]
 Decomposition:"""
 
     try:
-        response = await llm_provider.invoke_chat(prompt, temperature=0.3)
+        response = await llm_provider.invoke_chat_fast(prompt, temperature=0.3)
         state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(response)
 
-        # Parse the JSON response
+        # Parse the JSON response — planner
         sub_questions = json.loads(response)
         if not isinstance(sub_questions, list):
             sub_questions = [response]
@@ -96,60 +96,93 @@ async def research_node(state: ResearchState, llm_provider: LLMProvider) -> dict
     """
     Research Agent Node.
     Performs web search (Tavily) and document RAG (pgvector) for each sub-question.
-    Requirement 5.3: Research performs Tavily web search for each sub-question
-    Requirement 5.4: Research performs pgvector search for uploaded documents
     """
     start_time = datetime.now()
-    
+
     if not state.get('sub_questions'):
         state['status'] = 'failed'
         state['error'] = 'No sub-questions from planner'
         return state
-    
+
+    if not _check_budget(state, 'research'):
+        return state
+
     state['research_results'] = {}
-    
+
+    # Lazy-import to avoid hard dependency when not configured
+    from app.config import get_settings
+    settings = get_settings()
+
     try:
-        # For each sub-question, gather research
         for question in state['sub_questions']:
-            research_sources = []
-            
-            # Mock web search (would call Tavily in production)
-            if True:  # Using mock for dev
-                research_sources.append({
-                    'type': 'web',
-                    'title': f'Research result for: {question[:50]}',
-                    'url': 'https://example.com/1',
-                    'snippet': f'Mock research evidence addressing: {question}'
+            sources = []
+
+            # --- Real Tavily web search ---
+            if settings.tavily_api_key and not settings.mock_tavily_responses:
+                try:
+                    from tavily import TavilyClient
+                    client = TavilyClient(api_key=settings.tavily_api_key)
+                    result = await asyncio.to_thread(
+                        client.search, question, max_results=3, search_depth="basic"
+                    )
+                    for r in result.get("results", []):
+                        sources.append({
+                            "type": "web",
+                            "title": r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "snippet": r.get("content", "")[:500],
+                        })
+                except Exception as e:
+                    logger.warning(f"Tavily search failed for '{question}': {e}")
+            else:
+                # Mock fallback for dev
+                sources.append({
+                    "type": "web",
+                    "title": f"Research result for: {question[:50]}",
+                    "url": "https://example.com/1",
+                    "snippet": f"Mock research evidence addressing: {question}",
                 })
-            
-            # Mock document search (would call pgvector in production)
+
+            # --- Real pgvector document search ---
             if state.get('uploaded_doc_ids'):
-                research_sources.append({
-                    'type': 'document',
-                    'title': 'Uploaded document reference',
-                    'doc_id': state['uploaded_doc_ids'][0] if state['uploaded_doc_ids'] else 'doc1',
-                    'snippet': 'Relevant content from uploaded documents'
-                })
-            
-            state['research_results'][question] = research_sources
-        
+                try:
+                    from app.rag.store import EmbeddingStore
+                    db_url = settings.database_url.replace(
+                        "postgresql+asyncpg://", "postgresql://"
+                    )
+                    store = EmbeddingStore(db_url)
+                    await store.initialize()
+                    query_embedding = await llm_provider.get_embedding(question)
+                    doc_results = await store.semantic_search(
+                        query_embedding, limit=3,
+                        document_ids=state['uploaded_doc_ids']
+                    )
+                    await store.close()
+                    for r in doc_results:
+                        sources.append({
+                            "type": "document",
+                            "title": "Uploaded document",
+                            "url": "",
+                            "snippet": r["content"][:500],
+                        })
+                except Exception as e:
+                    logger.warning(f"pgvector search failed: {e}")
+
+            state['research_results'][question] = sources
+
         state['agent_logs'].append({
             'agent': 'research',
             'status': 'complete',
             'prompt_version': PROMPT_VERSIONS['research'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000),
-            'sources_found': sum(len(s) for s in state['research_results'].values())
+            'sources_found': sum(len(s) for s in state['research_results'].values()),
         })
-        
         return state
+
     except Exception as e:
         state['status'] = 'failed'
         state['error'] = f"Research error: {str(e)}"
-        state['agent_logs'].append({
-            'agent': 'research',
-            'status': 'failed',
-            'error': str(e)
-        })
+        state['agent_logs'].append({'agent': 'research', 'status': 'failed', 'error': str(e)})
         return state
 
 
@@ -264,7 +297,7 @@ Provide your response as JSON with this format:
 
 Evaluation:"""
 
-        response = await llm_provider.invoke_chat(prompt, temperature=0.3)
+        response = await llm_provider.invoke_chat_fast(prompt, temperature=0.3)
         state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(response)
 
         try:

@@ -15,13 +15,15 @@ class Settings(BaseSettings):
     llm_provider: str = "mock"  # "bedrock", "openai", or "mock"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
+    openai_model_fast: str = "gpt-4o-mini"          # cheap model for planner/critic/research
     openai_embedding_model: str = "text-embedding-3-small"
-    
+
     # AWS Bedrock
     aws_region: str = "us-east-1"
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
-    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"   # synthesis/analysis
+    bedrock_model_id_fast: str = "anthropic.claude-3-haiku-20240307-v1:0" # planner/critic/research
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     
     # Tavily API

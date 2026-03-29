@@ -35,20 +35,34 @@ class EmbeddingStore:
                 json.dumps(metadata or {})
             )
     
-    async def semantic_search(self, query_embedding: List[float], 
-                            limit: int = 5) -> List[Dict[str, Any]]:
+    async def semantic_search(self, query_embedding: List[float],
+                            limit: int = 5,
+                            document_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Search for similar embeddings using cosine similarity."""
         async with self.pool.acquire() as conn:
-            results = await conn.fetch(
-                """
-                SELECT id, content, metadata, 1 - (embedding <=> $1) as similarity
-                FROM embeddings
-                ORDER BY embedding <=> $1
-                LIMIT $2
-                """,
-                query_embedding, limit
-            )
-            
+            if document_ids:
+                # Cast Python list to UUID array for the IN clause
+                results = await conn.fetch(
+                    """
+                    SELECT id, content, metadata, 1 - (embedding <=> $1) as similarity
+                    FROM embeddings
+                    WHERE document_id = ANY($3::uuid[])
+                    ORDER BY embedding <=> $1
+                    LIMIT $2
+                    """,
+                    query_embedding, limit, document_ids
+                )
+            else:
+                results = await conn.fetch(
+                    """
+                    SELECT id, content, metadata, 1 - (embedding <=> $1) as similarity
+                    FROM embeddings
+                    ORDER BY embedding <=> $1
+                    LIMIT $2
+                    """,
+                    query_embedding, limit
+                )
+
             return [
                 {
                     "id": str(r['id']),

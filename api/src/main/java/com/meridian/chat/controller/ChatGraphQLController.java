@@ -2,8 +2,10 @@ package com.meridian.chat.controller;
 
 import com.meridian.auth.entity.User;
 import com.meridian.auth.repository.UserRepository;
+import com.meridian.auth.util.JwtUtil;
 import com.meridian.chat.entity.ChatMessage;
 import com.meridian.chat.repository.ChatMessageRepository;
+import com.meridian.chat.service.ChatService;
 import com.meridian.common.exception.ForbiddenException;
 import com.meridian.common.exception.UnauthorizedException;
 import com.meridian.common.exception.ValidationException;
@@ -32,6 +34,8 @@ public class ChatGraphQLController {
     private final ChatMessageRepository chatMessageRepository;
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final ChatService chatService;
+    private final JwtUtil jwtUtil;
 
     @MutationMapping
     @Transactional
@@ -62,9 +66,11 @@ public class ChatGraphQLController {
             .build();
         chatMessageRepository.save(userMessage);
 
-        // Basic assistant response until full RAG chat pipeline is wired.
-        String assistantText = "Thanks for your question. Chat is connected now, but deep report-grounded answers are still being rolled out. "
-            + "Question received: \"" + trimmedContent + "\"";
+        // Proxy to AI service for RAG-grounded response
+        String accessToken = jwtUtil.generateAccessToken(userId, user.getEmail());
+        String assistantText = chatService.chat(
+            reportId.toString(), userId.toString(), trimmedContent, accessToken
+        );
 
         ChatMessage assistantMessage = ChatMessage.builder()
             .report(report)
