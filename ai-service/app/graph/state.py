@@ -2,6 +2,16 @@ from typing import TypedDict, Optional, List, Dict, Any
 from datetime import datetime
 
 
+# Prompt version registry — bump when prompts change
+PROMPT_VERSIONS = {
+    "planner": "1.0.0",
+    "research": "1.0.0",
+    "analysis": "1.0.0",
+    "critic": "1.0.0",
+    "synthesizer": "1.0.0",
+}
+
+
 class ResearchState(TypedDict):
     """
     LangGraph state for multi-agent research orchestration.
@@ -15,7 +25,14 @@ class ResearchState(TypedDict):
     llm_provider: str  # "bedrock" or "openai"
     research_depth: str  # "quick", "standard", or "deep"
     uploaded_doc_ids: List[str]  # Document IDs provided by user
-    
+
+    # Run metadata (prompt versioning)
+    prompt_versions: Dict[str, str]   # {agent_name: prompt_version}
+    model_id: Optional[str]           # resolved model identifier
+    retrieval_config_version: str     # version of retrieval config used
+    citation_policy_version: str      # version of citation enforcement policy
+    guardrail_policy_version: str     # version of guardrail rules
+
     # Agent outputs
     sub_questions: List[str]
     report_structure: Optional[str]
@@ -29,6 +46,10 @@ class ResearchState(TypedDict):
     
     # Citations
     citations: List[Dict[str, str]]
+
+    # Token budget tracking
+    tokens_used: int          # running total across all agent calls
+    token_budget: int         # max tokens allowed for this job
     
     # Execution tracking
     agent_logs: List[Dict[str, Any]]
@@ -43,7 +64,11 @@ VALID_STATUSES = {"pending", "running", "complete", "failed", "cancelled"}
 VALID_DEPTHS = {"quick", "standard", "deep"}
 VALID_PROVIDERS = {"bedrock", "openai", "mock"}
 
-AGENT_SEQUENCE = {
+TOKEN_BUDGETS = {
+    "quick": 20_000,
+    "standard": 60_000,
+    "deep": 120_000,
+}
     "quick": ["planner", "research"],
     "standard": ["planner", "research", "analysis", "critic", "synthesizer"],
     "deep": ["planner", "research", "analysis", "critic", "synthesizer"]

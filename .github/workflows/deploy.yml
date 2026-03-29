@@ -180,13 +180,34 @@ jobs:
             --set meridian-ai.image.tag=${{ github.sha }} \
             --set meridian-frontend.image.tag=${{ github.sha }} \
             --wait \
-            --timeout 10m
+            --timeout 10m \
+            --atomic
 
       - name: Verify deployment
         run: |
           kubectl rollout status deployment/meridian-api -n meridian
           kubectl rollout status deployment/meridian-ai -n meridian
           kubectl rollout status deployment/meridian-frontend -n meridian
+
+      - name: Smoke test after deploy
+        id: smoke
+        run: |
+          API_URL=$(kubectl get svc meridian-api -n meridian -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "localhost")
+          for i in {1..10}; do
+            if curl -sf "http://${API_URL}:8000/actuator/health" | grep -q '"status":"UP"'; then
+              echo "Smoke test passed"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Smoke test failed — triggering rollback"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          helm rollback meridian --namespace meridian
+          echo "Rolled back to previous release"
 
       - name: Get deployment info
         if: always()

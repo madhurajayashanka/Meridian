@@ -82,6 +82,7 @@ services:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
       S3_BUCKET: ${S3_BUCKET:-meridian-documents-local}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
     ports:
       - "8080:8080"
     volumes:

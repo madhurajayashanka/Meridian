@@ -2,6 +2,7 @@ package com.meridian.job.service;
 
 import com.meridian.auth.entity.User;
 import com.meridian.auth.repository.UserRepository;
+import com.meridian.common.audit.AuditService;
 import com.meridian.common.exception.ForbiddenException;
 import com.meridian.common.exception.ValidationException;
 import com.meridian.document.entity.Document;
@@ -47,6 +48,7 @@ public class ResearchJobService {
     private final FastApiClient fastApiClient;
     private final ReportRepository reportRepository;
     private final ReportContentStorageService reportContentStorageService;
+    private final AuditService auditService;
 
     private static final Pattern CITATION_PATTERN = Pattern.compile("\\[(\\d+)]");
 
@@ -115,6 +117,7 @@ public class ResearchJobService {
 
         ResearchJob savedJob = jobRepository.save(job);
         log.info("Research job {} created for user {}", savedJob.getId(), userId);
+        auditService.log(userId, "research_job", savedJob.getId(), "CREATE");
 
         // Submit to AI service
         try {
@@ -245,17 +248,25 @@ public class ResearchJobService {
         job.setStatus("CANCELLED");
         job.setUpdatedAt(LocalDateTime.now());
         jobRepository.save(job);
-
+        auditService.log(userId, "research_job", jobId, "CANCEL");
         log.info("Job {} cancelled for user {}", jobId, userId);
     }
 
     /**
      * Update job status from AI service.
      * Called by webhook or polling from AI service.
+     * Idempotent: ignores updates when job is already in a terminal state.
      */
     public void updateJobStatus(UUID jobId, String status, String errorMessage) {
         ResearchJob job = jobRepository.findById(jobId)
             .orElseThrow(() -> new ValidationException("Job not found"));
+
+        // Idempotency: don't overwrite a terminal state
+        String current = job.getStatus();
+        if ("COMPLETE".equals(current) || "FAILED".equals(current) || "CANCELLED".equals(current)) {
+            log.info("Job {} already in terminal state {}, ignoring status update to {}", jobId, current, status);
+            return;
+        }
 
         job.setStatus(status);
         if (errorMessage != null) {

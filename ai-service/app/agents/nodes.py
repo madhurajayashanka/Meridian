@@ -1,8 +1,28 @@
 import json
+import logging
 from typing import Optional, List
 from datetime import datetime
-from app.graph.state import ResearchState
+from app.graph.state import ResearchState, PROMPT_VERSIONS
 from app.llm.provider import LLMProvider
+from app.guardrails import check_input, check_output, GuardrailViolation
+
+logger = logging.getLogger(__name__)
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate: ~4 chars per token."""
+    return max(1, len(text) // 4)
+
+
+def _check_budget(state: ResearchState, agent: str) -> bool:
+    """Return False and mark job failed if token budget is exceeded."""
+    if state.get('tokens_used', 0) >= state.get('token_budget', 999_999):
+        state['status'] = 'failed'
+        state['error'] = f"Token budget exceeded at {agent} agent ({state['tokens_used']} / {state['token_budget']})"
+        state['agent_logs'].append({'agent': agent, 'status': 'failed', 'error': state['error']})
+        logger.warning(state['error'])
+        return False
+    return True
 
 
 async def planner_node(state: ResearchState, llm_provider: LLMProvider) -> dict:
@@ -12,6 +32,18 @@ async def planner_node(state: ResearchState, llm_provider: LLMProvider) -> dict:
     Requirement 5.2: Planner decomposes query into 3-5 focused sub-questions
     """
     start_time = datetime.now()
+
+    # Guardrail: reject injected queries before any LLM call
+    try:
+        check_input(state['query'])
+    except GuardrailViolation as e:
+        state['status'] = 'failed'
+        state['error'] = f"Guardrail blocked query: {e.reason}"
+        state['agent_logs'].append({'agent': 'planner', 'status': 'failed', 'error': state['error']})
+        return state
+
+    if not _check_budget(state, 'planner'):
+        return state
     
     prompt = f"""You are a research planning expert. 
     
@@ -26,7 +58,8 @@ Decomposition:"""
 
     try:
         response = await llm_provider.invoke_chat(prompt, temperature=0.3)
-        
+        state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(response)
+
         # Parse the JSON response
         sub_questions = json.loads(response)
         if not isinstance(sub_questions, list):
@@ -42,6 +75,7 @@ Decomposition:"""
         state['agent_logs'].append({
             'agent': 'planner',
             'status': 'complete',
+            'prompt_version': PROMPT_VERSIONS['planner'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000),
             'sub_questions_count': len(sub_questions)
         })
@@ -102,6 +136,7 @@ async def research_node(state: ResearchState, llm_provider: LLMProvider) -> dict
         state['agent_logs'].append({
             'agent': 'research',
             'status': 'complete',
+            'prompt_version': PROMPT_VERSIONS['research'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000),
             'sources_found': sum(len(s) for s in state['research_results'].values())
         })
@@ -130,7 +165,10 @@ async def analysis_node(state: ResearchState, llm_provider: LLMProvider) -> dict
         state['status'] = 'failed'
         state['error'] = 'No research results'
         return state
-    
+
+    if not _check_budget(state, 'analysis'):
+        return state
+
     try:
         # Build context from research results
         research_context = ""
@@ -153,6 +191,7 @@ Please write a detailed, well-structured analysis with inline citations.
 Include multiple paragraphs covering different aspects of the topic."""
 
         analysis = await llm_provider.invoke_chat(prompt, temperature=0.5)
+        state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(analysis or '')
         if not analysis or not str(analysis).strip():
             state['status'] = 'failed'
             state['error'] = 'Analysis agent returned empty content'
@@ -168,6 +207,7 @@ Include multiple paragraphs covering different aspects of the topic."""
         state['agent_logs'].append({
             'agent': 'analysis',
             'status': 'complete',
+            'prompt_version': PROMPT_VERSIONS['analysis'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000),
             'iteration': state['analysis_iteration']
         })
@@ -197,7 +237,10 @@ async def critic_node(state: ResearchState, llm_provider: LLMProvider) -> dict:
         state['status'] = 'failed'
         state['error'] = 'No analysis draft to critique'
         return state
-    
+
+    if not _check_budget(state, 'critic'):
+        return state
+
     try:
         prompt = f"""You are a critical analysis evaluator. 
 
@@ -222,20 +265,27 @@ Provide your response as JSON with this format:
 Evaluation:"""
 
         response = await llm_provider.invoke_chat(prompt, temperature=0.3)
-        
+        state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(response)
+
         try:
             evaluation = json.loads(response)
-            state['critic_score'] = float(evaluation.get('score', 5.0))
+            score = evaluation.get('score')
+            # Structured output validation: score must be a number in [1, 10]
+            if not isinstance(score, (int, float)) or not (1.0 <= float(score) <= 10.0):
+                raise ValueError(f"Invalid critic score: {score!r}")
+            state['critic_score'] = float(score)
             state['critic_feedback'] = evaluation.get('feedback', '')
-        except:
-            # If JSON parsing fails, use mock
-            state['critic_score'] = 8.0
+        except (json.JSONDecodeError, ValueError, KeyError):
+            # Deterministic fallback when LLM response parsing fails
+            logger.warning("Critic response parsing failed; using fallback score 7.0")
+            state['critic_score'] = 7.0
             state['critic_feedback'] = "Analysis appears comprehensive and well-structured."
         
         state['critic_iterations'] += 1
         state['agent_logs'].append({
             'agent': 'critic',
             'status': 'complete',
+            'prompt_version': PROMPT_VERSIONS['critic'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000),
             'score': state['critic_score']
         })
@@ -264,7 +314,10 @@ async def synthesizer_node(state: ResearchState, llm_provider: LLMProvider) -> d
         state['status'] = 'failed'
         state['error'] = 'No analysis draft to synthesize'
         return state
-    
+
+    if not _check_budget(state, 'synthesizer'):
+        return state
+
     try:
         prompt = f"""You are a report writer. 
 
@@ -286,13 +339,24 @@ Analysis to transform:
 Generate the final report:"""
 
         report = await llm_provider.invoke_chat(prompt, temperature=0.4)
-        
+        state['tokens_used'] = state.get('tokens_used', 0) + _estimate_tokens(prompt) + _estimate_tokens(report or '')
+
+        # Guardrail: check final report for unsafe content
+        try:
+            check_output(report)
+        except GuardrailViolation as e:
+            state['status'] = 'failed'
+            state['error'] = f"Guardrail blocked synthesizer output: {e.reason}"
+            state['agent_logs'].append({'agent': 'synthesizer', 'status': 'failed', 'error': state['error']})
+            return state
+
         state['final_report'] = report
         state['status'] = 'complete'
         state['completed_at'] = datetime.now().isoformat()
         state['agent_logs'].append({
             'agent': 'synthesizer',
             'status': 'complete',
+            'prompt_version': PROMPT_VERSIONS['synthesizer'],
             'duration_ms': int((datetime.now() - start_time).total_seconds() * 1000)
         })
         

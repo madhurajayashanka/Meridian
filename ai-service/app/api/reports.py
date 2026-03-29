@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class ReportStorageService:
     """Service for storing and retrieving reports."""
     
-    def __init__(self, db_pool: asyncpg.Pool, s3_client, s3_bucket: str = "meridian-reports"):
+    def __init__(self, db_pool: asyncpg.Pool, s3_client, llm_provider, s3_bucket: str = "meridian-reports"):
         self.db_pool = db_pool
         self.s3_client = s3_client
+        self.llm_provider = llm_provider
         self.s3_bucket = s3_bucket
     
     async def store_report(
@@ -152,47 +153,30 @@ class ReportStorageService:
     async def _embed_report_chunks(self, report_id: str, content: str):
         """
         Create embeddings for report sections for RAG.
-        
-        Args:
-            report_id: ID of the report
-            content: Full report content
         """
         try:
-            # Split content by H2 headers to create meaningful chunks
             chunks = self._split_by_headers(content)
-            
-            # Get embeddings for each chunk
-            embeddings_data = []
-            for idx, chunk in enumerate(chunks):
-                if not chunk.strip():
-                    continue
-                
-                # In a real implementation, call the embedding model
-                # For now, we'll store placeholder embeddings
-                embeddings_data.append({
-                    'chunk': chunk,
-                    'chunk_index': idx
-                })
-            
-            # Save embeddings to PostgreSQL
-            if embeddings_data:
-                async with self.db_pool.acquire() as conn:
-                    for data in embeddings_data:
-                        # Placeholder vector - in production, call embedding API
-                        await conn.execute("""
-                            INSERT INTO embeddings (
-                                id, report_id, content, embedding, chunk_index, created_at
-                            ) VALUES ($1, $2, $3, $4, $5, NOW())
-                        """,
-                        str(__import__('uuid').uuid4()),
-                        report_id,
-                        data['chunk'],
-                        "[0.1]",  # Placeholder embedding - replace with real embedding API
-                        data['chunk_index']
-                        )
-                
-                logger.info(f"Created {len(embeddings_data)} embeddings for report {report_id}")
-        
+
+            async with self.db_pool.acquire() as conn:
+                for idx, chunk in enumerate(chunks):
+                    if not chunk.strip():
+                        continue
+                    # Generate real embedding via the injected provider
+                    embedding_vector = await self.llm_provider.embed_text(chunk)
+                    await conn.execute("""
+                        INSERT INTO embeddings (
+                            id, report_id, content, embedding, chunk_index, created_at
+                        ) VALUES ($1, $2, $3, $4::vector, $5, NOW())
+                    """,
+                    str(__import__('uuid').uuid4()),
+                    report_id,
+                    chunk,
+                    embedding_vector,
+                    idx
+                    )
+
+            logger.info(f"Created {len(chunks)} embeddings for report {report_id}")
+
         except Exception as e:
             logger.warning(f"Error creating report embeddings: {e}")
             # Don't fail the entire report save if embeddings creation fails
@@ -269,7 +253,7 @@ class ReportStorageService:
             return None
 
 
-async def create_report_storage_service(db_pool, s3_bucket: str = "meridian-reports"):
+async def create_report_storage_service(db_pool, llm_provider, s3_bucket: str = "meridian-reports"):
     """Factory function to create report storage service."""
     try:
         # Initialize S3 client
@@ -282,7 +266,7 @@ async def create_report_storage_service(db_pool, s3_bucket: str = "meridian-repo
             logger.info(f"Creating S3 bucket: {s3_bucket}")
             s3_client.create_bucket(Bucket=s3_bucket)
         
-        return ReportStorageService(db_pool, s3_client, s3_bucket)
+        return ReportStorageService(db_pool, s3_client, llm_provider, s3_bucket)
     
     except Exception as e:
         logger.error(f"Error creating report storage service: {e}")

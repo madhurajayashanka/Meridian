@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -8,11 +8,18 @@ from datetime import datetime
 import uuid
 import logging
 import httpx
+import jwt as pyjwt
+import hmac
+import hashlib
 
 from app.config import get_settings, Settings
 from app.graph.workflow import build_research_graph, create_initial_state
 from app.llm.provider import get_llm_provider
 from app.rag.store import EventPublisher
+from app.metrics import (
+    metrics_endpoint, http_metrics_middleware,
+    JOB_STARTED, JOB_COMPLETED, JOB_FAILED, JOB_DURATION,
+)
 import redis
 
 # Configure logging
@@ -34,6 +41,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(http_metrics_middleware)
+app.add_route("/metrics", metrics_endpoint)
 
 # Global state
 settings = None
@@ -43,7 +52,32 @@ redis_client = None
 active_jobs = {}  # job_id -> state
 
 
-@app.on_event("startup")
+CORRELATION_ID_HEADER = "X-Correlation-ID"
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    """Propagate or generate X-Correlation-ID for every request."""
+    correlation_id = request.headers.get(CORRELATION_ID_HEADER) or str(uuid.uuid4())
+    import contextvars
+    token = _correlation_id_var.set(correlation_id)
+    response = await call_next(request)
+    response.headers[CORRELATION_ID_HEADER] = correlation_id
+    _correlation_id_var.reset(token)
+    return response
+
+
+import contextvars
+_correlation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "correlation_id", default=""
+)
+
+
+def get_correlation_id() -> str:
+    return _correlation_id_var.get("")
+
+
+
 async def startup():
     """Initialize services on startup."""
     global settings, event_publisher, research_graphs, redis_client
@@ -109,7 +143,38 @@ def get_research_graph(provider_name: str):
     return research_graphs[normalized]
 
 
-@app.get("/health")
+def validate_jwt_token(token: str) -> dict:
+    """
+    Validate a JWT token using the configured RSA public key.
+    Falls back to a non-empty check when no public key is configured (dev mode).
+    Returns the decoded payload or raises HTTPException on failure.
+    """
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    public_key = settings.jwt_public_key
+    if not public_key:
+        # Dev mode: no key configured — accept any non-empty token
+        logger.warning("JWT_PUBLIC_KEY not configured; skipping signature verification (dev mode)")
+        return {}
+
+    try:
+        # Normalize PEM (env vars may use literal \n)
+        pem = public_key.replace("\\n", "\n")
+        payload = pyjwt.decode(
+            token,
+            pem,
+            algorithms=["RS256"],
+            options={"verify_exp": True},
+        )
+        return payload
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except pyjwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+
+
+
 async def health_check():
     """Health check endpoint."""
     return {
@@ -156,8 +221,8 @@ async def start_job(
         
         # Start async job execution
         asyncio.create_task(execute_job(job_id, state))
-        
-        logger.info(f"Job {job_id} started for user {user_id}")
+        JOB_STARTED.inc()
+        logger.info(f"Job {job_id} started for user {user_id} [correlation_id={get_correlation_id()}]")
         
         return {
             "job_id": job_id,
@@ -172,6 +237,7 @@ async def start_job(
 
 async def execute_job(job_id: str, initial_state):
     """Execute the research job workflow."""
+    _job_start = __import__('time').perf_counter()
     try:
         # Invoke the LangGraph workflow
         research_graph = get_research_graph(initial_state.get('llm_provider'))
@@ -189,6 +255,8 @@ async def execute_job(job_id: str, initial_state):
         
         # Publish job complete event
         if final_state.get('status') == 'complete':
+            JOB_COMPLETED.inc()
+            JOB_DURATION.observe(__import__('time').perf_counter() - _job_start)
             report_id = str(uuid.uuid4())
             final_report = final_state.get('final_report') or ''
             await event_publisher.publish_job_complete(job_id, report_id)
@@ -216,6 +284,7 @@ async def execute_job(job_id: str, initial_state):
             
             logger.info(f"Job {job_id} completed with report {report_id}")
         else:
+            JOB_FAILED.labels(reason="workflow_failed").inc()
             await event_publisher.publish_job_failed(job_id, final_state.get('error', 'Unknown error'))
             # Notify Spring API of failure
             try:
@@ -229,6 +298,7 @@ async def execute_job(job_id: str, initial_state):
             logger.error(f"Job {job_id} failed: {final_state.get('error')}")
     
     except Exception as e:
+        JOB_FAILED.labels(reason="exception").inc()
         logger.error(f"Error executing job {job_id}: {e}")
         await event_publisher.publish_job_failed(job_id, str(e))
         try:
@@ -263,10 +333,8 @@ async def stream_events(job_id: str, token: str = Query(...)):
     Requirement 18.1: SSE endpoint with JWT validation
     """
     
-    # In production: validate JWT from token parameter
-    # For now, just check it's not empty
-    if not token:
-        return HTTPException(status_code=401, detail="Unauthorized")
+    # Validate JWT — raises 401 if invalid/expired
+    validate_jwt_token(token)
     
     async def event_generator():
         """Generate SSE events from Redis Streams."""

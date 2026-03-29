@@ -1,7 +1,11 @@
 package com.meridian.job.client;
 
+import com.meridian.config.CorrelationIdFilter;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -33,17 +37,21 @@ public class FastApiClient {
     @Value("${ai.service.timeout:30000}")
     private Integer timeout;
 
+    /** Build headers that propagate the current correlation ID to the AI service. */
+    private HttpHeaders correlationHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
+        if (correlationId != null) {
+            headers.set(CorrelationIdFilter.CORRELATION_ID_HEADER, correlationId);
+        }
+        return headers;
+    }
+
     /**
      * Start a new research job on the AI service.
-     *
-     * @param jobId Research job ID
-     * @param userId User ID
-     * @param query Research query
-     * @param llmProvider LLM provider (bedrock or openai)
-     * @param researchDepth Research depth (quick, standard, or deep)
-     * @param documentIds List of document IDs to include
-     * @return Job response from AI service
      */
+    @CircuitBreaker(name = "ai-service", fallbackMethod = "startJobFallback")
+    @Retry(name = "ai-service")
     public FastApiJobResponse startJob(
         String jobId,
         String projectId,
@@ -75,7 +83,7 @@ public class FastApiClient {
             ResponseEntity<FastApiJobResponse> response = restTemplate.exchange(
                 url,
                 HttpMethod.POST,
-                HttpEntity.EMPTY,
+                new HttpEntity<>(correlationHeaders()),
                 FastApiJobResponse.class
             );
 
@@ -92,11 +100,16 @@ public class FastApiClient {
         }
     }
 
+    /** Circuit breaker fallback — AI service is unavailable. */
+    private FastApiJobResponse startJobFallback(String jobId, String projectId, String userId,
+            String query, String llmProvider, String researchDepth,
+            List<String> documentIds, Throwable t) {
+        log.error("AI service circuit open for job {}: {}", jobId, t.getMessage());
+        throw new FastApiException("AI service is currently unavailable. Please try again later.", t);
+    }
+
     /**
      * Get job status from AI service.
-     *
-     * @param jobId Research job ID
-     * @return Job status response
      */
     public FastApiJobStatusResponse getJobStatus(String jobId) {
         try {

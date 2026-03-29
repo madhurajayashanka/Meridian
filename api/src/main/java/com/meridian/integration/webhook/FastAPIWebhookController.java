@@ -3,15 +3,21 @@ package com.meridian.integration.webhook;
 import com.meridian.job.service.ResearchJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.MessageDigest;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +29,34 @@ import java.util.UUID;
 public class FastAPIWebhookController {
 
     private final ResearchJobService jobService;
+
+    @Value("${webhook.secret:}")
+    private String webhookSecret;
+
+    /** Verify HMAC-SHA256 signature from AI service. Skip in dev when secret is blank. */
+    private boolean isValidSignature(String payload, String signature) {
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.warn("WEBHOOK_SECRET not configured — skipping signature check (dev mode)");
+            return true;
+        }
+        if (signature == null || !signature.startsWith("sha256=")) return false;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] expected = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : expected) hex.append(String.format("%02x", b));
+            String expectedHex = "sha256=" + hex;
+            // Constant-time comparison
+            return MessageDigest.isEqual(
+                expectedHex.getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8)
+            );
+        } catch (Exception e) {
+            log.error("Signature verification error", e);
+            return false;
+        }
+    }
 
     @PostMapping("/jobs/{jobId}/status")
     public ResponseEntity<Map<String, Object>> updateJobStatus(
@@ -53,8 +87,13 @@ public class FastAPIWebhookController {
     @PostMapping("/jobs/{jobId}/complete")
     public ResponseEntity<Map<String, Object>> completeJob(
         @PathVariable UUID jobId,
-        @RequestBody JobCompleteWebhook webhook
+        @RequestBody JobCompleteWebhook webhook,
+        @RequestHeader(value = "X-Webhook-Signature", required = false) String signature,
+        @RequestHeader(value = "X-Raw-Body", required = false) String rawBody
     ) {
+        if (!isValidSignature(rawBody != null ? rawBody : "", signature)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid signature"));
+        }
         try {
             log.info("Received job completion: jobId={}, reportId={}", jobId, webhook.reportId);
 

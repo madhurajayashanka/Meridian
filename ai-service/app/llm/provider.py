@@ -34,6 +34,34 @@ class LLMProvider(ABC):
         """Embed text and return vector."""
         pass
 
+    async def get_embedding(self, text: str) -> List[float]:
+        """Alias for embed_text — used by RAG chat service."""
+        return await self.embed_text(text)
+
+    async def stream_chat(self, messages: List[Dict[str, Any]]):
+        """
+        Stream chat response token by token.
+        Default implementation falls back to invoke_chat and yields the full response.
+        Override in subclasses for true streaming.
+        """
+        # Build a single prompt from messages list
+        prompt_parts = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                prompt_parts.append(f"[System]: {content}")
+            elif role == "assistant":
+                prompt_parts.append(f"[Assistant]: {content}")
+            else:
+                prompt_parts.append(f"[User]: {content}")
+        prompt = "\n".join(prompt_parts)
+        response = await self.invoke_chat(prompt)
+        # Yield in small chunks to simulate streaming
+        chunk_size = 20
+        for i in range(0, len(response), chunk_size):
+            yield response[i:i + chunk_size]
+
 
 class MockProvider(LLMProvider):
     """

@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from datetime import datetime
 from langgraph.graph import StateGraph
-from app.graph.state import ResearchState, AGENT_SEQUENCE
+from app.graph.state import ResearchState, AGENT_SEQUENCE, PROMPT_VERSIONS, TOKEN_BUDGETS
 from app.agents.nodes import (
     planner_node, research_node, analysis_node, 
     critic_node, synthesizer_node
@@ -121,7 +121,14 @@ def create_initial_state(
         llm_provider=llm_provider,
         research_depth=research_depth,
         uploaded_doc_ids=uploaded_doc_ids or [],
-        
+
+        # Prompt versioning metadata
+        prompt_versions=dict(PROMPT_VERSIONS),
+        model_id=None,  # resolved at runtime by provider
+        retrieval_config_version="1.0.0",
+        citation_policy_version="1.0.0",
+        guardrail_policy_version="1.0.0",
+
         # Agent outputs (empty initially)
         sub_questions=[],
         report_structure=None,
@@ -133,6 +140,10 @@ def create_initial_state(
         critic_iterations=0,
         final_report=None,
         
+        # Token budget
+        tokens_used=0,
+        token_budget=TOKEN_BUDGETS.get(research_depth, TOKEN_BUDGETS["standard"]),
+
         # Citations and logging
         citations=[],
         agent_logs=[],

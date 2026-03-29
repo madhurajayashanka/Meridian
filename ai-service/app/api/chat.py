@@ -37,20 +37,22 @@ class RAGChatService:
         try:
             # Get embedding for the query
             query_embedding = await self.llm_provider.get_embedding(query)
-            
+            # pgvector expects a list/array, not a string
+            embedding_vector = query_embedding if isinstance(query_embedding, list) else list(query_embedding)
+
             # Search pgvector for similar chunks
             async with self.db_pool.acquire() as conn:
                 chunks = await conn.fetch("""
                     SELECT 
                         id::text,
                         content,
-                        (1 - (embedding <=> $1)) as similarity_score,
+                        (1 - (embedding <=> $1::vector)) as similarity_score,
                         metadata
                     FROM embeddings
                     WHERE report_id = $2
-                    ORDER BY embedding <=> $1
+                    ORDER BY embedding <=> $1::vector
                     LIMIT $3
-                """, str(query_embedding), report_id, top_k)
+                """, embedding_vector, report_id, top_k)
             
             result = [
                 {
@@ -61,8 +63,19 @@ class RAGChatService:
                 }
                 for chunk in chunks
             ]
-            
-            logger.info(f"Retrieved {len(result)} chunks for report {report_id}")
+
+            # Retrieval observability: log top-k scores and hit/miss
+            if result:
+                scores = [r['similarity'] for r in result]
+                logger.info(
+                    f"RAG retrieval for report {report_id}: "
+                    f"top_k={top_k}, hits={len(result)}, "
+                    f"max_score={max(scores):.3f}, min_score={min(scores):.3f}, "
+                    f"avg_score={sum(scores)/len(scores):.3f}"
+                )
+            else:
+                logger.warning(f"RAG retrieval MISS for report {report_id}: no chunks found")
+
             return result
         
         except Exception as e:

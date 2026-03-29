@@ -38,7 +38,9 @@ class Settings(BaseSettings):
     research_deep_agents: str = "planner,research,analysis,critic,synthesizer"
     research_deep_max_critic_iterations: int = 3
     
-    # Application
+    # JWT validation
+    jwt_public_key: str = ""
+    webhook_secret: str = ""  # HMAC-SHA256 secret shared with Spring API
     log_level: str = "INFO"
     debug: bool = False
     e2e_with_llm: bool = False
