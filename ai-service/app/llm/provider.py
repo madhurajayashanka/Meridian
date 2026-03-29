@@ -1,5 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
+import importlib
+import asyncio
+from types import SimpleNamespace
+
+import boto3
 
 
 class LLMProvider(ABC):
@@ -167,9 +172,42 @@ class BedrockProvider(LLMProvider):
                  region: str = "us-east-1"):
         self.model_id = self._normalize_model_id(model_id)
         self.embedding_model = embedding_model
-        self.region = region
+        self.region = self._normalize_region(region)
         self.chat_model = None
         self.embedding_model_obj = None
+
+    def _build_boto3_converse_adapter(self, temperature: float):
+        """Return a minimal async adapter that mimics langchain chat model interface."""
+        client = boto3.client("bedrock-runtime", region_name=self.region)
+        model_id = self.model_id
+
+        class _Boto3ConverseAdapter:
+            async def ainvoke(self, prompt: str):
+                def _invoke():
+                    return client.converse(
+                        modelId=model_id,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [{"text": prompt}],
+                            }
+                        ],
+                        inferenceConfig={"temperature": temperature},
+                    )
+
+                # Keep extraction resilient to API response shape differences.
+                response = await asyncio.to_thread(_invoke)
+                content_blocks = (
+                    response.get("output", {})
+                    .get("message", {})
+                    .get("content", [])
+                )
+                text = "".join(
+                    block.get("text", "") for block in content_blocks if isinstance(block, dict)
+                ).strip()
+                return SimpleNamespace(content=text)
+
+        return _Boto3ConverseAdapter()
 
     @staticmethod
     def _normalize_model_id(model_id: str) -> str:
@@ -182,15 +220,59 @@ class BedrockProvider(LLMProvider):
 
         return normalized
 
+    @staticmethod
+    def _load_chat_bedrock_converse_class():
+        """Load ChatBedrockConverse from supported langchain_aws module paths."""
+        candidate_paths = [
+            ("langchain_aws", "ChatBedrockConverse"),
+            ("langchain_aws.chat_models", "ChatBedrockConverse"),
+            ("langchain_aws.chat_models.bedrock_converse", "ChatBedrockConverse"),
+        ]
+
+        for module_name, class_name in candidate_paths:
+            try:
+                module = importlib.import_module(module_name)
+                converse_cls = getattr(module, class_name, None)
+                if converse_cls is not None:
+                    return converse_cls
+            except ImportError:
+                continue
+
+        return None
+
+    @staticmethod
+    def _looks_like_inference_profile_id(model_id: str) -> bool:
+        """Detect common Bedrock inference profile ID prefixes."""
+        return model_id.startswith(("us.", "eu.", "apac.", "sa."))
+
+    @staticmethod
+    def _normalize_region(region: str) -> str:
+        """Normalize region formatting from env/config."""
+        return (region or "us-east-1").strip().lower().replace("_", "-").replace(" ", "-")
+
     async def get_chat_model(self, temperature: float = 0.3):
         """Get or create Bedrock chat model."""
         if self.chat_model is None:
-            from langchain_aws import ChatBedrock
-            self.chat_model = ChatBedrock(
-                model_id=self.model_id,
-                region_name=self.region,
-                model_kwargs={"temperature": temperature}
-            )
+            converse_cls = self._load_chat_bedrock_converse_class()
+            if converse_cls is not None:
+                self.chat_model = converse_cls(
+                    model_id=self.model_id,
+                    region_name=self.region,
+                    temperature=temperature
+                )
+            else:
+                # Legacy fallback for older langchain-aws releases.
+                if self._looks_like_inference_profile_id(self.model_id):
+                    self.chat_model = self._build_boto3_converse_adapter(temperature)
+                    return self.chat_model
+
+                from langchain_aws import ChatBedrock
+                self.chat_model = ChatBedrock(
+                    model_id=self.model_id,
+                    region_name=self.region,
+                    provider="anthropic", 
+                    model_kwargs={"temperature": temperature}
+                )
         return self.chat_model
 
     async def get_embedding_model(self):
