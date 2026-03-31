@@ -1,22 +1,21 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+    && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
-# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
 COPY . .
 
-# Health check
+RUN chown -R appuser:appgroup /app
+USER appuser
+
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
 EXPOSE 8080
 

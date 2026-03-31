@@ -32,7 +32,7 @@ public class DocumentService {
     private final ProjectRepository projectRepository;
     private final RestTemplate restTemplate;
 
-    @Value("${ai.service.url:http://localhost:8080}")
+    @Value("${ai.service.url:http://ai-service:8080}")
     private String aiServiceUrl;
 
     @Value("${internal.api.key:}")

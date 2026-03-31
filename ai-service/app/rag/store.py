@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 import asyncpg
 import redis
@@ -102,7 +103,6 @@ class EventPublisher:
         
         try:
             self.redis.xadd(stream_key, event)
-            # Set TTL to 24 hours
             self.redis.expire(stream_key, 86400)
         except Exception as e:
             print(f"Error publishing event: {e}")
@@ -147,6 +147,3 @@ class EventPublisher:
             'status': 'failed'
         }
         await self.publish_event(job_id, event)
-
-
-from datetime import datetime

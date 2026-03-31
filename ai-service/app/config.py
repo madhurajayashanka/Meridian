@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
-    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"   # synthesis/analysis
-    bedrock_model_id_fast: str = "anthropic.claude-3-haiku-20240307-v1:0" # planner/critic/research
+    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_model_id_fast: str = "anthropic.claude-3-haiku-20240307-v1:0"
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     
     # Tavily API
@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     
     # Internal service-to-service auth
     internal_api_key: str = ""  # set INTERNAL_API_KEY env; Spring sends this header
+
+    # Internal service URL (AI → Spring API callbacks)
+    api_internal_url: str = "http://api:8000"
 
     # CORS
     cors_allowed_origins: str = "http://localhost:3000"  # comma-separated list

@@ -91,13 +91,33 @@ variable "redis_num_cache_nodes" {
 variable "eks_public_access_cidrs" {
   description = "CIDRs allowed to reach the EKS public API endpoint. Restrict to your office/VPN IPs in production."
   type        = list(string)
-  default     = ["0.0.0.0/0"]  # override in prod tfvars with your actual CIDRs
+  default     = []  # empty = private-only by default; set in tfvars per env
 }
 
 variable "eks_cluster_version" {
   description = "EKS cluster Kubernetes version"
   type        = string
-  default     = "1.28"
+  default     = "1.30"
+}
+
+variable "eks_instance_type" {
+  description = "EC2 instance type for EKS worker nodes"
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "rds_engine_version" {
+  description = "PostgreSQL engine version"
+  type        = string
+  default     = "16"
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default = {
+    Project = "meridian"
+  }
 }
 
 variable "eks_desired_size" {
@@ -136,10 +156,8 @@ variable "enable_nat_gateway" {
   default     = true
 }
 
-variable "tags" {
-  description = "Tags to apply to resources"
-  type        = map(string)
-  default = {
-    Project = "meridian"
-  }
+variable "app_domain" {
+  description = "Public domain for the application (used in S3 CORS)"
+  type        = string
+  default     = ""
 }

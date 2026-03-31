@@ -21,7 +21,7 @@ public class ReportContentStorageService {
     private final Path baseDir;
 
     public ReportContentStorageService(
-        @Value("${report.content.dir:/tmp/meridian-reports}") String baseDir
+        @Value("${REPORT_CONTENT_DIR:/tmp/meridian-reports}") String baseDir
     ) {
         this.baseDir = Paths.get(baseDir);
     }

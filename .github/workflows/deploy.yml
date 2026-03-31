@@ -3,14 +3,14 @@ name: Deploy to Production
 on:
   push:
     branches:
-      - prod
+      - main
     paths:
       - "infra/terraform/**"
       - "helm/**"
       - ".github/workflows/deploy.yml"
   pull_request:
     branches:
-      - prod
+      - main
     paths:
       - "infra/terraform/**"
       - "helm/**"
@@ -27,9 +27,11 @@ on:
           - production
 
 env:
-  AWS_REGION: us-east-1
-  TERRAFORM_VERSION: 1.5.0
-  HELM_VERSION: v3.12.0
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TERRAFORM_VERSION: "1.7.5"
+  HELM_VERSION: "v3.14.0"
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'meridian-eks-cluster' }}
+  APP_DOMAIN: ${{ vars.APP_DOMAIN || 'meridian.example.com' }}
 
 jobs:
   # Terraform plan and apply
@@ -55,7 +57,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform init
-        run: terraform init
+        run: terraform init -backend-config=environments/${{ github.event.inputs.environment || 'production' }}/backend.hcl -input=false
 
       - name: Terraform validate
         run: terraform validate
@@ -145,7 +147,7 @@ jobs:
 
       - name: Get EKS cluster
         run: |
-          aws eks update-kubeconfig --name meridian-eks-cluster --region ${{ env.AWS_REGION }}
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
       - name: Create namespace
         run: kubectl create namespace meridian --dry-run=client -o yaml | kubectl apply -f -
@@ -176,6 +178,10 @@ jobs:
           helm upgrade --install meridian ./helm \
             --namespace meridian \
             --values helm/values.yaml \
+            --set global.domain=${{ env.APP_DOMAIN }} \
+            --set global.tls.email=${{ secrets.TLS_EMAIL }} \
+            --set monitoring.grafana.adminPassword=${{ secrets.GRAFANA_ADMIN_PASSWORD }} \
+            --set "meridian-frontend.configMap.NEXT_PUBLIC_APP_VERSION=${{ github.sha }}" \
             --set meridian-api.image.tag=${{ github.sha }} \
             --set meridian-ai.image.tag=${{ github.sha }} \
             --set meridian-frontend.image.tag=${{ github.sha }} \
@@ -242,7 +248,7 @@ jobs:
       - name: Wait for deployment
         run: |
           for i in {1..30}; do
-            if curl -f http://meridian.example.com; then
+            if curl -f https://${{ env.APP_DOMAIN }}; then
               echo "Service is ready"
               exit 0
             fi

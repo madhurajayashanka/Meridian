@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Optional, List
@@ -147,17 +148,24 @@ async def research_node(state: ResearchState, llm_provider: LLMProvider) -> dict
             if state.get('uploaded_doc_ids'):
                 try:
                     from app.rag.store import EmbeddingStore
-                    db_url = settings.database_url.replace(
-                        "postgresql+asyncpg://", "postgresql://"
-                    )
-                    store = EmbeddingStore(db_url)
-                    await store.initialize()
+                    # Reuse the global db_pool injected via state to avoid per-question pool creation
+                    _pool = state.get('_db_pool')
+                    if _pool is None:
+                        # fallback: create once and cache in state
+                        import asyncpg
+                        from app.config import get_settings as _gs
+                        _s = _gs()
+                        _db_url = _s.database_url.replace("postgresql+asyncpg://", "postgresql://")
+                        _pool = await asyncpg.create_pool(_db_url, min_size=1, max_size=3)
+                        state['_db_pool'] = _pool
+                    store = EmbeddingStore.__new__(EmbeddingStore)
+                    store.db_url = None
+                    store.pool = _pool
                     query_embedding = await llm_provider.get_embedding(question)
                     doc_results = await store.semantic_search(
                         query_embedding, limit=3,
                         document_ids=state['uploaded_doc_ids']
                     )
-                    await store.close()
                     for r in doc_results:
                         sources.append({
                             "type": "document",

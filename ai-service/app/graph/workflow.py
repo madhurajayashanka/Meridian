@@ -8,11 +8,37 @@ from app.agents.nodes import (
 )
 from app.llm.provider import LLMProvider
 
+# Maximum wall-clock seconds a job may run before being force-failed
+JOB_TIMEOUT_SECS = {
+    "quick": 120,
+    "standard": 300,
+    "deep": 600,
+}
 
-def _end(state): return "__end__"
+
+def _is_terminal(state: ResearchState) -> bool:
+    return state.get("status") in ("failed", "cancelled")
+
+
+def _check_timeout(state: ResearchState) -> ResearchState:
+    """Fail the job if it has exceeded its wall-clock budget."""
+    started = state.get("started_at")
+    if started:
+        try:
+            elapsed = (datetime.now() - datetime.fromisoformat(str(started))).total_seconds()
+            limit = JOB_TIMEOUT_SECS.get(state.get("research_depth", "standard"), 300)
+            if elapsed > limit:
+                state["status"] = "failed"
+                state["error"] = f"Job timed out after {int(elapsed)}s (limit {limit}s)"
+        except Exception:
+            pass
+    return state
+
+
 def _fail_or(next_node):
     def route(state):
-        return "END" if state.get("status") == "failed" else next_node
+        _check_timeout(state)
+        return "END" if _is_terminal(state) else next_node
     return route
 
 
@@ -27,13 +53,12 @@ def build_research_graph(llm_provider: LLMProvider):
     graph.add_node("critic",      lambda s: critic_node(s, llm_provider))
     graph.add_node("synthesizer", lambda s: synthesizer_node(s, llm_provider))
 
-    # planner → research (all depths)
     graph.add_conditional_edges("planner", _fail_or("research"),
                                 {"research": "research", "END": "__end__"})
 
-    # research → synthesizer (quick) or analysis (standard/deep)
     def after_research(state):
-        if state.get("status") == "failed":
+        _check_timeout(state)
+        if _is_terminal(state):
             return "END"
         return "synthesizer" if state.get("research_depth") == "quick" else "analysis"
 
@@ -44,7 +69,8 @@ def build_research_graph(llm_provider: LLMProvider):
                                 {"critic": "critic", "END": "__end__"})
 
     def critic_route(state):
-        if state.get("status") == "failed":
+        _check_timeout(state)
+        if _is_terminal(state):
             return "END"
         if state.get("critic_score", 0) < 7.0 and state.get("critic_iterations", 0) < 3:
             return "analysis"

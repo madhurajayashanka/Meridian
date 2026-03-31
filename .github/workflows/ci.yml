@@ -3,11 +3,11 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - prod
+      - main
       - develop
   pull_request:
     branches:
-      - prod
+      - main
       - develop
 
 env:
@@ -34,36 +34,36 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: gradle
+          cache: maven
 
       - name: Lint (Checkstyle)
-        run: ./gradlew checkstyleMain
+        run: mvn -B checkstyle:check
 
       - name: Run unit tests
-        run: ./gradlew test --info
+        run: mvn -B test
 
       - name: Run integration tests
-        run: ./gradlew integrationTest --info
+        run: mvn -B verify -Pintegration-tests
 
       - name: Generate coverage report
-        run: ./gradlew jacocoTestReport
+        run: mvn -B jacoco:report
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./build/reports/jacoco/test/jacocoTestReport.xml
+          files: ./target/site/jacoco/jacoco.xml
           flags: backend
           fail_ci_if_error: true
           minimum_coverage_percentage: 80
 
       - name: Build JAR
-        run: ./gradlew build -x test
+        run: mvn -B -DskipTests package
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: api-jar
-          path: build/libs/*.jar
+          path: target/*.jar
           retention-days: 5
 
   # AI Service (FastAPI) - Lint, Test, Build
@@ -163,8 +163,6 @@ jobs:
     needs: [backend, ai-service, frontend]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-
-    strategy:
       matrix:
         service:
           - name: api
@@ -273,3 +271,48 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
+
+  # IaC security scanning
+  iac-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkov IaC scan (Terraform + Helm + Dockerfiles)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,helm,dockerfile
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+
+      - name: tfsec Terraform scan
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: infra/terraform
+          soft_fail: true
+
+  # Dockerfile linting
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint api/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: api/Dockerfile
+      - name: Lint ai-service/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ai-service/Dockerfile
+      - name: Lint frontend/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile

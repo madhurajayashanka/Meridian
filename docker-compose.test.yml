@@ -1,0 +1,25 @@
+# docker-compose.test.yml
+# Isolated test environment — no ports exposed to host.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: meridian_test
+
+  api:
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian_test
+      GRAPHIQL_ENABLED: "false"
+      LOG_LEVEL: WARN
+
+  ai-service:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://meridian:${POSTGRES_PASSWORD:-meridian_dev_password}@postgres:5432/meridian_test
+      LLM_PROVIDER: mock
+      MOCK_TAVILY_RESPONSES: "true"
+      E2E_WITH_LLM: "false"
+      LOG_LEVEL: WARNING
+
+  frontend:
+    environment:
+      NEXT_PUBLIC_ENV: test

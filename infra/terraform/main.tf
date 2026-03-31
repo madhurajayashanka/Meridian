@@ -8,13 +8,10 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "meridian-terraform-state"
-    key            = "prod/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-lock"
-  }
+  # State bucket and key are passed via -backend-config at init time.
+  # Run: terraform init -backend-config=backend.hcl
+  # See scripts/tf-bootstrap.sh to create the bucket + lock table first.
+  backend "s3" {}
 }
 
 provider "aws" {

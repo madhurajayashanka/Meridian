@@ -1,0 +1,23 @@
+# docker-compose.override.yml
+# Local dev overrides — automatically merged by `docker compose up`.
+# Never commit secrets here. Use .env for secrets.
+services:
+  api:
+    environment:
+      GRAPHIQL_ENABLED: "true"
+      LOG_LEVEL: DEBUG
+    # Expose postgres port locally for DB tools (TablePlus, psql, etc.)
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  ai-service:
+    environment:
+      LOG_LEVEL: DEBUG
+      DEBUG: "true"
+      MOCK_TAVILY_RESPONSES: "true"

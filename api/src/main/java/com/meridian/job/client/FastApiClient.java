@@ -31,14 +31,11 @@ public class FastApiClient {
 
     private final RestTemplate restTemplate;
 
-    @Value("${ai.service.url:http://localhost:8080}")
+    @Value("${ai.service.url:http://ai-service:8080}")
     private String aiServiceUrl;
 
     @Value("${internal.api.key:}")
     private String internalApiKey;
-
-    @Value("${ai.service.timeout:30000}")
-    private Integer timeout;
 
     /** Build headers that propagate correlation ID and service key to the AI service. */
     private HttpHeaders correlationHeaders() {

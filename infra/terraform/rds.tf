@@ -12,7 +12,7 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_instance" "main" {
   identifier            = "${var.app_name}-postgres"
   engine                = "postgres"
-  engine_version        = "15"
+  engine_version        = var.rds_engine_version
   instance_class        = var.rds_instance_class
   allocated_storage     = var.rds_allocated_storage
   storage_type          = "gp3"
@@ -32,7 +32,7 @@ resource "aws_db_instance" "main" {
   # Security
   publicly_accessible    = false
   storage_encrypted      = true
-  ssl_certificate_identifier = "rds-ca-2019"
+  ssl_certificate_identifier = var.rds_ca_identifier
   
   # Performance Insights
   performance_insights_enabled          = true
@@ -93,7 +93,7 @@ resource "aws_cloudwatch_log_group" "rds" {
 # Database parameter group for pgvector support
 resource "aws_db_parameter_group" "main" {
   name   = "${var.app_name}-postgres-params"
-  family = "postgres15"
+  family = "postgres${split(".", var.rds_engine_version)[0]}"
 
   parameter {
     name  = "shared_preload_libraries"

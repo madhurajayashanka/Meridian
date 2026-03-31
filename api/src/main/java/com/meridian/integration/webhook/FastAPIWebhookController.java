@@ -87,14 +87,15 @@ public class FastAPIWebhookController {
     @PostMapping("/jobs/{jobId}/complete")
     public ResponseEntity<Map<String, Object>> completeJob(
         @PathVariable UUID jobId,
-        @RequestBody JobCompleteWebhook webhook,
-        @RequestHeader(value = "X-Webhook-Signature", required = false) String signature,
-        @RequestHeader(value = "X-Raw-Body", required = false) String rawBody
+        @RequestBody String rawBody,
+        @RequestHeader(value = "X-Webhook-Signature", required = false) String signature
     ) {
-        if (!isValidSignature(rawBody != null ? rawBody : "", signature)) {
+        if (!isValidSignature(rawBody, signature)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid signature"));
         }
         try {
+            JobCompleteWebhook webhook = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue(rawBody, JobCompleteWebhook.class);
             log.info("Received job completion: jobId={}, reportId={}", jobId, webhook.reportId);
 
             jobService.completeJobWithReport(
@@ -109,10 +110,7 @@ public class FastAPIWebhookController {
                 webhook.revisionCount
             );
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Job completed");
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Job completed"));
         } catch (Exception e) {
             log.error("Error processing job completion webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

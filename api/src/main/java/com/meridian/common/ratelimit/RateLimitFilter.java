@@ -52,14 +52,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (isJobCreationRequest(requestToUse, path)) {
             RateLimitService.RateLimitResult result = rateLimitService.checkJobLimit(userId);
             if (!result.allowed) {
-                response.setStatus(429); // Too Many Requests
+                response.setStatus(429);
                 response.setHeader("Retry-After", String.valueOf(result.retryAfterSeconds));
                 response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"" + result.message + "\",\"retryAfter\":" + result.retryAfterSeconds + "}");
+                response.getWriter().write("{\"error\":\"Job submission rate limit exceeded\",\"retryAfter\":" + result.retryAfterSeconds + "}");
                 return;
             }
         } else {
-            // General rate limit for other authenticated endpoints
             RateLimitService.RateLimitResult result = rateLimitService.checkGeneralLimit(userId);
             if (!result.allowed) {
                 response.setStatus(429);

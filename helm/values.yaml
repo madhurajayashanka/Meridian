@@ -4,7 +4,8 @@
 # Global settings
 global:
   environment: production
-  domain: meridian.example.com
+  # Override via --set global.domain=yourdomain.com or APP_DOMAIN env in CI
+  domain: ""  # REQUIRED — set via --set or values override
 
   imageRegistry: ghcr.io
   imagePullSecrets: []
@@ -19,7 +20,8 @@ global:
   tls:
     enabled: true
     issuer: letsencrypt-prod
-    email: admin@meridian.example.com
+    # Override via --set global.tls.email or TLS_EMAIL secret in CI
+    email: ""  # REQUIRED — set via --set or secrets
 
 # External Secrets Operator — pulls secrets from AWS Secrets Manager into K8s secrets
 # Install ESO first: helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
@@ -48,7 +50,7 @@ meridian-api:
   ingress:
     enabled: true
     hosts:
-      - host: api.meridian.example.com
+      - host: "api.{{ .Values.global.domain }}"
         paths:
           - path: /
             pathType: Prefix
@@ -109,7 +111,7 @@ meridian-ai:
   ingress:
     enabled: true
     hosts:
-      - host: ai.meridian.example.com
+      - host: "ai.{{ .Values.global.domain }}"
         paths:
           - path: /
             pathType: Prefix
@@ -161,7 +163,7 @@ meridian-frontend:
   ingress:
     enabled: true
     hosts:
-      - host: meridian.example.com
+      - host: "{{ .Values.global.domain }}"
         paths:
           - path: /
             pathType: Prefix
@@ -183,9 +185,9 @@ meridian-frontend:
   # Environment variables
   configMap:
     NODE_ENV: production
-    NEXT_PUBLIC_API_URL: https://api.meridian.example.com
-    NEXT_PUBLIC_API_GRAPHQL_URL: https://api.meridian.example.com/graphql
-    NEXT_PUBLIC_APP_VERSION: "1.0"
+    NEXT_PUBLIC_API_URL: "https://api.{{ .Values.global.domain }}"
+    NEXT_PUBLIC_API_GRAPHQL_URL: "https://api.{{ .Values.global.domain }}/graphql"
+    # NEXT_PUBLIC_APP_VERSION injected at deploy time via --set
 
 # Monitoring and Observability
 monitoring:
@@ -197,7 +199,8 @@ monitoring:
 
   grafana:
     enabled: true
-    adminPassword: changeme
+    # adminPassword — set via --set monitoring.grafana.adminPassword or GRAFANA_ADMIN_PASSWORD secret
+    adminPassword: ""  # REQUIRED — never commit a real password here
 
 # Network Policies
 networkPolicy:
